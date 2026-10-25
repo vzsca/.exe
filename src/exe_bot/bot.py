@@ -185,7 +185,59 @@ def build_bot(settings: Settings) -> ExeBot:
             channel_name = str(args[0]).strip()
             if not channel_name or len(channel_name) > 100:
                 raise ScriptError("Channel name must contain 1 to 100 characters.")
-            await guild.create_text_channel(channel_name, reason=f".exe by {actor.id}")
+
+            category = None
+            if len(args) >= 2 and str(args[1]).strip():
+                raw_category = str(args[1]).strip()
+                category = guild.get_channel(int(raw_category)) if raw_category.isdigit() else discord.utils.get(
+                    guild.categories, name=raw_category
+                )
+                if not isinstance(category, discord.CategoryChannel):
+                    raise ScriptError("Category must be an existing category ID or exact name.")
+
+            overwrites = {}
+            if len(args) >= 3 and str(args[2]).strip():
+                allowed_channel_permissions = {
+                    "view_channel", "send_messages", "read_message_history",
+                    "embed_links", "attach_files", "add_reactions", "use_external_emojis",
+                    "manage_messages", "manage_channels", "manage_permissions",
+                    "connect", "speak", "stream", "use_voice_activation",
+                    "send_messages_in_threads", "create_public_threads",
+                    "create_private_threads", "send_polls",
+                }
+                # Format: "@everyone:view_channel=deny, Moderators:send_messages=allow"
+                # Entries target @everyone or an existing role by exact name / ID.
+                for entry in str(args[2]).split(","):
+                    entry = entry.strip()
+                    match = re.fullmatch(r"(.+?):([a-z_]+)=(allow|deny)", entry, re.IGNORECASE)
+                    if not match:
+                        raise ScriptError(
+                            'Channel permissions use "role:permission=allow|deny", '
+                            'for example "@everyone:view_channel=deny".'
+                        )
+                    target_name, permission, decision = match.groups()
+                    target_name = target_name.strip()
+                    permission = permission.lower()
+                    decision = decision.lower()
+                    if permission not in allowed_channel_permissions:
+                        raise ScriptError(f"Unsupported channel permission: {permission}.")
+                    if target_name == "@everyone":
+                        target = guild.default_role
+                    elif target_name.isdigit():
+                        target = guild.get_role(int(target_name))
+                    else:
+                        target = discord.utils.get(guild.roles, name=target_name)
+                    if target is None:
+                        raise ScriptError(f"Could not find channel permission target role: {target_name}.")
+                    overwrite = overwrites.setdefault(target, discord.PermissionOverwrite())
+                    setattr(overwrite, permission, decision == "allow")
+
+            await guild.create_text_channel(
+                channel_name,
+                category=category,
+                overwrites=overwrites or None,
+                reason=f".exe by {actor.id}",
+            )
         elif name == "delete_channel":
             raw = str(args[0])
             channel = guild.get_channel(int(raw)) if raw.isdigit() else discord.utils.get(guild.text_channels, name=raw)
