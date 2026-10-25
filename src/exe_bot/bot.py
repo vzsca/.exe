@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 
 from .config import Settings
-from .language import ScriptError, SendMessage, parse_script
+from .language import ScriptError, SendMessage, expand_actions, parse_script
 from .permissions import may_run_scripts
 
 log = logging.getLogger(__name__)
@@ -38,14 +38,14 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.reply("Access denied: you are not allowed to run `.exe` scripts.", mention_author=False)
             return
 
-        # Accept optional fenced code blocks, without treating their contents as Python.
         cleaned = script.strip()
         if cleaned.startswith("```") and cleaned.endswith("```"):
             lines = cleaned.splitlines()
             cleaned = "\n".join(lines[1:-1])
 
         try:
-            actions = parse_script(cleaned, max_actions=settings.max_script_actions)
+            instructions = parse_script(cleaned, max_actions=settings.max_script_actions)
+            actions = expand_actions(instructions)
         except ScriptError as exc:
             await ctx.reply(f"`Syntax error:` {exc}", mention_author=False)
             return
@@ -60,10 +60,7 @@ def build_bot(settings: Settings) -> ExeBot:
                     )
 
         try:
-            await asyncio.wait_for(
-                execute_actions(),
-                timeout=settings.script_timeout_seconds,
-            )
+            await asyncio.wait_for(execute_actions(), timeout=settings.script_timeout_seconds)
             await ctx.message.add_reaction("✅")
         except TimeoutError:
             await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
@@ -75,10 +72,11 @@ def build_bot(settings: Settings) -> ExeBot:
     @bot.command(name="help_exe")
     async def help_exe(ctx: commands.Context) -> None:
         await ctx.reply(
-            "`.exe` early test syntax:\n"
-            "Standard: `!exe send(\\"Hello\\")`\n"
-            "Compact: `!exe m(\\"Hello\\")`\n"
-            "Multiple lines can be sent in a code block. Only registered language instructions are accepted.",
+            "`.exe` prototype syntax:\n"
+            "Standard: `!exe let greeting = \\"Hello\\"; send(greeting)`\n"
+            "Compact: `!exe v(greeting, \\"Hello\\"); m(greeting)`\n"
+            "Repeat: `repeat 3: send(greeting)` or `R(3, m(greeting))`\n"
+            "Both forms use the same safe instruction engine.",
             mention_author=False,
         )
 
