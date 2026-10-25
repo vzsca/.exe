@@ -47,7 +47,7 @@ def build_bot(settings: Settings) -> ExeBot:
     async def on_ready() -> None:
         log.info("Connected as %s (ID: %s)", bot.user, bot.user.id if bot.user else "unknown")
 
-    async def execute_discord_action(ctx: commands.Context, action: DiscordAction) -> None:
+    async def execute_discord_action(ctx: commands.Context, action: DiscordAction) -> str | None:
         """Run one explicitly supported Discord action after checking native permissions."""
         if ctx.guild is None:
             raise ScriptError("Discord administration functions only work inside a server.")
@@ -168,12 +168,13 @@ def build_bot(settings: Settings) -> ExeBot:
                     for permission in set(requested):
                         setattr(role_permissions, permission, True)
 
-            await guild.create_role(
+            created_role = await guild.create_role(
                 name=role_name,
                 colour=role_color,
                 permissions=role_permissions,
                 reason=f".exe by {actor.id}",
             )
+            return created_role.mention
         elif name == "delete_role":
             raw = str(args[0])
             role = guild.get_role(int(raw)) if raw.isdigit() else discord.utils.get(guild.roles, name=raw)
@@ -378,7 +379,9 @@ def build_bot(settings: Settings) -> ExeBot:
                         )
                     elif isinstance(action, DiscordAction):
                         try:
-                            await execute_discord_action(ctx, action)
+                            action_result = await execute_discord_action(ctx, action)
+                            if action.result_variable and action_result is not None:
+                                runtime_variables[action.result_variable] = action_result
                         except discord.Forbidden as exc:
                             log.warning(
                                 "Discord denied .exe action %s in guild %s (channel %s), actor %s, target args %r: %s",
