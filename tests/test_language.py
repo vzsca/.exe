@@ -2,6 +2,7 @@ import pytest
 
 from exe_bot.language import (
     ScriptError,
+    InputVariable,
     DiscordAction,
     SendMessage,
     SetVariable,
@@ -315,3 +316,18 @@ def test_send_can_target_a_channel_by_name_or_id():
 def test_f_string_does_not_allow_python_expressions():
     with pytest.raises(ScriptError, match="only support text and defined variables"):
         parse_script('send(f"{1 + 1}")')
+
+
+def test_input_variable_is_parsed_and_kept_in_action_order():
+    program = parse_script('let pseudo = input("Quel est ton pseudo ?")\nsend(f"Bienvenue {pseudo} !")')
+    assert isinstance(program[0], InputVariable)
+    assert program[0].name == "pseudo"
+    assert program[0].question == "Quel est ton pseudo ?"
+    actions = expand_actions(program)
+    assert actions[0] == program[0]
+    assert actions[1] == SendMessage("Bienvenue __EXE_VAR_pseudo__ !", None, True)
+
+
+def test_input_requires_a_non_empty_question():
+    with pytest.raises(ScriptError, match="input question cannot be empty"):
+        parse_script('let answer = input("")\nsend("ok")')
