@@ -369,7 +369,7 @@ def build_bot(settings: Settings) -> ExeBot:
                                     if role not in allowed_roles:
                                         allowed_roles.append(role)
                             # Numeric role IDs are also accepted as explicit mentions.
-                            role_id_pattern = re.compile(r"@([0-9]{15,22})(?=\\s|$|[,!.?:;])")
+                            role_id_pattern = re.compile(r"@([0-9]{15,22})(?=\s|$|[,!.?:;])")
                             def replace_role_id(match: re.Match[str]) -> str:
                                 role = ctx.guild.get_role(int(match.group(1)))
                                 if role is None:
