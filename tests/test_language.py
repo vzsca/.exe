@@ -351,6 +351,17 @@ def test_list_and_dictionary_are_bounded():
         parse_script('let users = ' + repr(list(range(101))) + '\nsend("ok")')
 
 
+
+def test_indented_counted_loop_supports_counter_interpolation():
+    program = parse_script(
+        'repeat 3 as i:\\n'
+        '    send(f"item {i}")'
+    )
+    assert expand_actions(program) == [
+        SendMessage("item 1"), SendMessage("item 2"), SendMessage("item 3")
+    ]
+
+
 def test_counted_loop_interpolates_role_names_and_keeps_ping_actions():
     program = parse_script('repeat 3 as i: send(f"{create_role(\'role {i}\')}")')
     assert program == [
