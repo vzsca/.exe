@@ -51,9 +51,18 @@ I(greeting, "Hello", m("Matched"))
 E(m("Not matched"))
 
 Compact one-liner: `v(greeting, "Hello")§m(greeting)§R(3, m(greeting))`
+
+Compact loops and conditions can now contain multiple instructions separated by `§`:
+
+```text
+R(2, m("Starting")§create_role("Tester", "#5865F2", "view_channel, send_messages"))
+I(mode, "safe", m("Allowed")§create_category("Safe-zone"))
 ```
 
-For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons or `§` can also separate instructions on a single line; `§` is the compact syntax separator and behaves like a newline outside quoted text.
+Separators inside a quoted string remain literal text. The loop count and total action budget are still enforced, including for nested loops.
+```
+
+For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons or `§` can also separate top-level instructions on a single line; `§` is the compact syntax separator and behaves like a newline outside quoted text. Inside compact `R(...)` and `I(...)` calls, use `§` to separate the nested instructions.
 
 ### Discord action examples
 
