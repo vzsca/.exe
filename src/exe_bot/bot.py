@@ -67,9 +67,12 @@ def build_bot(settings: Settings) -> ExeBot:
                 entries = [f"#{channel.name} (ID: {channel.id})" for channel in sorted(guild.channels, key=lambda item: item.position) if not isinstance(channel, discord.CategoryChannel)]
             else:
                 entries = [f"{category.name} (ID: {category.id})" for category in sorted(guild.categories, key=lambda item: item.position)]
-            safe_entries = [entry.replace("@", "@\\u200b") for entry in entries]
-            suffix = "\\n… liste limitée à 100 éléments." if name == "guilds_members" and len(entries) >= 100 else ""
-            return ("\\n".join(safe_entries) if safe_entries else "(aucun élément)") + suffix
+            safe_entries = [entry.replace("@", "@\u200b") for entry in entries]
+            suffix = "\n… liste limitée à 100 éléments." if name == "guilds_members" and len(entries) >= 100 else ""
+            result = ("\n".join(safe_entries) if safe_entries else "(aucun élément)") + suffix
+            if len(result) > 1700:
+                result = result[:1690] + "\n… résultat tronqué."
+            return result
         if not isinstance(actor, discord.Member):
             raise ScriptError("Could not verify your server permissions.")
         bot_member = guild.me
