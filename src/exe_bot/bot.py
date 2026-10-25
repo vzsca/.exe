@@ -361,16 +361,23 @@ def build_bot(settings: Settings) -> ExeBot:
                         if action.role_mentions:
                             if ctx.guild is None:
                                 raise ScriptError("Role mentions only work inside a server.")
-                            role_pattern = re.compile(r"@([A-Za-z0-9_-][A-Za-z0-9_ -]{0,99}?)(?=\s|$|[,!.?:;])")
-                            def replace_role(match: re.Match[str]) -> str:
-                                raw_role = match.group(1).strip()
-                                role = (ctx.guild.get_role(int(raw_role)) if raw_role.isdigit()
-                                        else discord.utils.get(ctx.guild.roles, name=raw_role))
+                            # Match exact role names longest-first, including names with spaces.
+                            for role in sorted(ctx.guild.roles, key=lambda item: len(item.name), reverse=True):
+                                token = f"@{role.name}"
+                                if token in content:
+                                    content = content.replace(token, role.mention)
+                                    if role not in allowed_roles:
+                                        allowed_roles.append(role)
+                            # Numeric role IDs are also accepted as explicit mentions.
+                            role_id_pattern = re.compile(r"@([0-9]{15,22})(?=\\s|$|[,!.?:;])")
+                            def replace_role_id(match: re.Match[str]) -> str:
+                                role = ctx.guild.get_role(int(match.group(1)))
                                 if role is None:
                                     return match.group(0)
-                                allowed_roles.append(role)
+                                if role not in allowed_roles:
+                                    allowed_roles.append(role)
                                 return role.mention
-                            content = role_pattern.sub(replace_role, content)
+                            content = role_id_pattern.sub(replace_role_id, content)
                         await target.send(
                             content,
                             allowed_mentions=discord.AllowedMentions(
