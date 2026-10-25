@@ -11,7 +11,7 @@ Both syntaxes compile into the same internal instruction types and use the same 
 
 Implemented:
 - `send("Hello")` / compact `m("Hello")` to send a message.
-- Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `create_role`, `delete_role`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
+- Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `create_role`, `delete_role`, `create_category`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
 - `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
@@ -72,7 +72,7 @@ slowmode(5)
 clear(25)
 ```
 
-For `create_channel`, the channel name is required. The optional second argument is an existing category name or ID. The optional third argument defines permission overwrites as comma-separated `target:permission=allow|deny` entries. Use `@everyone` or an existing role name/ID as the target, and supported channel permissions such as `view_channel`, `send_messages`, `read_message_history`, `manage_messages`, `connect`, or `speak`. Example: `create_channel("private", "Staff", "@everyone:view_channel=deny, Moderators:view_channel=allow")`. If a category is provided without custom overwrites, the new channel inherits that category's permissions.
+For `create_category`, the category name is required; an optional second argument defines category permission overwrites using comma-separated `target:permission=allow|deny` entries. The category is created directly by the bot, and channels placed inside it inherit its permissions when no custom channel overwrites are supplied. For `create_channel`, the channel name is required. The optional second argument is an existing category name or ID. The optional third argument defines permission overwrites as comma-separated `target:permission=allow|deny` entries. Use `@everyone` or an existing role name/ID as the target, and supported channel permissions such as `view_channel`, `send_messages`, `read_message_history`, `manage_messages`, `connect`, or `speak`. Example: `create_channel("private", "Staff", "@everyone:view_channel=deny, Moderators:view_channel=allow")`. If a category is provided without custom overwrites, the new channel inherits that category's permissions.
 
 For `create_role`, the name is required; color and permissions are optional. Use a six-digit hex color (for example `"#5865F2"`) and a comma-separated permission string (for example `"view_channel, send_messages, manage_messages"`). Supported permissions are `view_channel`, `send_messages`, `read_message_history`, `embed_links`, `attach_files`, `add_reactions`, `use_external_emojis`, `connect`, `speak`, `stream`, `use_voice_activation`, `manage_messages`, `manage_nicknames`, `kick_members`, `ban_members`, `moderate_members`, and `view_audit_log`. High-risk permissions, including `administrator`, are intentionally not supported.
 
