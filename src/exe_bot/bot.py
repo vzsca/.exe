@@ -212,7 +212,8 @@ def build_bot(settings: Settings) -> ExeBot:
             'Run / delete saved: !exe run greeting / !exe delete greeting\n'
             'Standard: let greeting = "Hello"; send(greeting)\n'
             'Compact: v(greeting, "Hello"); m(greeting)\n'
-            'Condition: if greeting == "Hello": send("yes") or I(greeting, "Hello", m("yes"))\n'
+            'Condition: if greeting == "Hello": send("yes"); optional next line: else: send("no")\n'
+            'Compact condition: I(greeting, "Hello", m("yes")) (without else)\n'
             'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
             'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.',
             mention_author=False,
