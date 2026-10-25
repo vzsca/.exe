@@ -236,6 +236,7 @@ def build_bot(settings: Settings) -> ExeBot:
                 channel_name,
                 category=category,
                 overwrites=overwrites or None,
+                sync_permissions=bool(category and not overwrites),
                 reason=f".exe by {actor.id}",
             )
         elif name == "delete_channel":
