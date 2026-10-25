@@ -68,9 +68,13 @@ def build_bot(settings: Settings) -> ExeBot:
             "clear": "manage_messages",
         }
         required = permission_by_action[name]
-        if not getattr(actor.guild_permissions, required, False):
+        # Discord administrators implicitly have every guild permission. Check the
+        # administrator flag explicitly as a safeguard against permission-flag quirks.
+        actor_permissions = actor.guild_permissions
+        bot_permissions = bot_member.guild_permissions
+        if not (actor_permissions.administrator or getattr(actor_permissions, required, False)):
             raise ScriptError(f"You need the Discord '{required.replace('_', ' ').title()}' permission.")
-        if not getattr(bot_member.guild_permissions, required, False):
+        if not (bot_permissions.administrator or getattr(bot_permissions, required, False)):
             raise ScriptError(f"The bot needs the Discord '{required.replace('_', ' ').title()}' permission.")
 
         def target_id(raw: str | int) -> int:
@@ -83,6 +87,15 @@ def build_bot(settings: Settings) -> ExeBot:
         if name in {"ban", "unban", "kick", "timeout", "untimeout"}:
             user_id = target_id(args[0])
             member = guild.get_member(user_id)
+            if member is None and name != "unban":
+                # Members intent/cache may be unavailable, even when the user is
+                # visibly in the server. Fetch the member directly before refusing.
+                try:
+                    member = await guild.fetch_member(user_id)
+                except discord.NotFound:
+                    member = None
+                except discord.Forbidden as exc:
+                    raise ScriptError("Could not look up that member; check the bot's server access.") from exc
             if name == "unban":
                 try:
                     user = await bot.fetch_user(user_id)
