@@ -387,3 +387,13 @@ def test_counted_loop_interpolates_role_names_and_keeps_ping_actions():
         DiscordAction("create_role", ("role 3",), "__exe_result_0"),
         SendMessage("__EXE_VAR___exe_result_0__", None, True),
     ]
+
+
+
+def test_give_role_and_remove_role_actions_parse_member_and_role_targets():
+    assert parse_script('give_role("123456789012345678", "Moderators")') == [
+        DiscordAction("give_role", ("123456789012345678", "Moderators"))
+    ]
+    assert parse_script('remove_role("123456789012345678", "987654321098765432")') == [
+        DiscordAction("remove_role", ("123456789012345678", "987654321098765432"))
+    ]
