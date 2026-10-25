@@ -34,7 +34,7 @@ def build_bot(settings: Settings) -> ExeBot:
     @bot.command(name="exe")
     async def exe_command(ctx: commands.Context, *, script: str = "") -> None:
         """Run a short .exe script. Use a code block for multiple lines."""
-        if ctx.author.id != settings.owner_id and not may_run_scripts(ctx.author.id, settings):
+        if not may_run_scripts(ctx.author.id, settings):
             await ctx.reply("Access denied: you are not allowed to run `.exe` scripts.", mention_author=False)
             return
 
@@ -50,12 +50,23 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.reply(f"`Syntax error:` {exc}", mention_author=False)
             return
 
-        try:
+        async def execute_actions() -> None:
             for action in actions:
                 if isinstance(action, SendMessage):
-                    # Only the script author may send into the channel where it was invoked.
-                    await ctx.channel.send(action.text, allowed_mentions=discord.AllowedMentions.none())
+                    # Script-generated messages never ping users or roles.
+                    await ctx.channel.send(
+                        action.text,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+
+        try:
+            await asyncio.wait_for(
+                execute_actions(),
+                timeout=settings.script_timeout_seconds,
+            )
             await ctx.message.add_reaction("✅")
+        except TimeoutError:
+            await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
         except discord.Forbidden:
             await ctx.reply("I do not have permission to perform that action here.", mention_author=False)
         except discord.HTTPException:
@@ -65,8 +76,8 @@ def build_bot(settings: Settings) -> ExeBot:
     async def help_exe(ctx: commands.Context) -> None:
         await ctx.reply(
             "`.exe` early test syntax:\n"
-            "Standard: `!exe send(\"Hello\")`\n"
-            "Compact: `!exe m(\"Hello\")`\n"
+            "Standard: `!exe send(\\"Hello\\")`\n"
+            "Compact: `!exe m(\\"Hello\\")`\n"
             "Multiple lines can be sent in a code block. Only registered language instructions are accepted.",
             mention_author=False,
         )
