@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 
 from .config import Settings
-from .language import ScriptError, SendMessage, expand_actions, parse_script
+from .language import DiscordAction, ScriptError, SendMessage, expand_actions, parse_script
 from .permissions import is_owner, may_run_scripts
 from .storage import Database, StorageError
 
@@ -45,6 +45,117 @@ def build_bot(settings: Settings) -> ExeBot:
     async def on_ready() -> None:
         log.info("Connected as %s (ID: %s)", bot.user, bot.user.id if bot.user else "unknown")
 
+    async def execute_discord_action(ctx: commands.Context, action: DiscordAction) -> None:
+        """Run one explicitly supported Discord action after checking native permissions."""
+        if ctx.guild is None:
+            raise ScriptError("Discord administration functions only work inside a server.")
+        guild = ctx.guild
+        actor = ctx.author
+        if not isinstance(actor, discord.Member):
+            raise ScriptError("Could not verify your server permissions.")
+        bot_member = guild.me
+        if bot_member is None:
+            raise ScriptError("Could not verify the bot's server permissions.")
+
+        name, args = action.name, action.arguments
+        permission_by_action = {
+            "ban": "ban_members", "unban": "ban_members",
+            "kick": "kick_members", "timeout": "moderate_members",
+            "untimeout": "moderate_members", "create_role": "manage_roles",
+            "delete_role": "manage_roles", "create_channel": "manage_channels",
+            "delete_channel": "manage_channels", "slowmode": "manage_channels",
+            "clear": "manage_messages",
+        }
+        required = permission_by_action[name]
+        if not getattr(actor.guild_permissions, required, False):
+            raise ScriptError(f"You need the Discord '{required.replace('_', ' ').title()}' permission.")
+        if not getattr(bot_member.guild_permissions, required, False):
+            raise ScriptError(f"The bot needs the Discord '{required.replace('_', ' ').title()}' permission.")
+
+        def target_id(raw: str | int) -> int:
+            match = _USER_ID.fullmatch(str(raw))
+            if match is None:
+                raise ScriptError("Use a Discord ID or member mention for this target.")
+            return int(match.group(1) or match.group(2))
+
+        reason = str(args[1]) if len(args) > 1 else f".exe script by {actor} ({actor.id})"
+        if name in {"ban", "kick", "timeout", "untimeout"}:
+            user_id = target_id(args[0])
+            member = guild.get_member(user_id)
+            if name == "unban":
+                try:
+                    user = await bot.fetch_user(user_id)
+                    await guild.unban(user, reason=reason)
+                except discord.NotFound as exc:
+                    raise ScriptError("That user is not banned or could not be found.") from exc
+                return
+            if member is None:
+                if name == "ban":
+                    try:
+                        user = await bot.fetch_user(user_id)
+                    except discord.NotFound as exc:
+                        raise ScriptError("Could not find that Discord user.") from exc
+                    await guild.ban(user, reason=reason, delete_message_seconds=0)
+                    return
+                raise ScriptError("That member is not currently in this server.")
+            if member.id == actor.id or member.id == bot_member.id:
+                raise ScriptError("You cannot target yourself or the bot.")
+            if guild.owner_id != actor.id and member.top_role >= actor.top_role:
+                raise ScriptError("Discord role hierarchy prevents you from targeting that member.")
+            if member.top_role >= bot_member.top_role:
+                raise ScriptError("The bot's role must be higher than the target member's role.")
+            if name == "ban":
+                await guild.ban(member, reason=reason, delete_message_seconds=0)
+            elif name == "kick":
+                await member.kick(reason=reason)
+            elif name == "timeout":
+                minutes = args[1]
+                if not isinstance(minutes, int) or not 1 <= minutes <= 40320:
+                    raise ScriptError("timeout duration must be an integer from 1 to 40320 minutes.")
+                await member.timeout(discord.utils.utcnow() + __import__("datetime").timedelta(minutes=minutes), reason=f".exe by {actor.id}")
+            else:
+                await member.timeout(None, reason=f".exe by {actor.id}")
+            return
+
+        if name == "create_role":
+            role_name = str(args[0]).strip()
+            if not role_name or len(role_name) > 100:
+                raise ScriptError("Role name must contain 1 to 100 characters.")
+            await guild.create_role(name=role_name, reason=f".exe by {actor.id}")
+        elif name == "delete_role":
+            raw = str(args[0])
+            role = guild.get_role(int(raw)) if raw.isdigit() else discord.utils.get(guild.roles, name=raw)
+            if role is None:
+                raise ScriptError("Could not find that role by ID or exact name.")
+            if role.is_default() or role >= bot_member.top_role or (guild.owner_id != actor.id and role >= actor.top_role):
+                raise ScriptError("Discord role hierarchy prevents deleting that role.")
+            await role.delete(reason=f".exe by {actor.id}")
+        elif name == "create_channel":
+            channel_name = str(args[0]).strip()
+            if not channel_name or len(channel_name) > 100:
+                raise ScriptError("Channel name must contain 1 to 100 characters.")
+            await guild.create_text_channel(channel_name, reason=f".exe by {actor.id}")
+        elif name == "delete_channel":
+            raw = str(args[0])
+            channel = guild.get_channel(int(raw)) if raw.isdigit() else discord.utils.get(guild.text_channels, name=raw)
+            if channel is None:
+                raise ScriptError("Could not find that channel by ID or exact name.")
+            await channel.delete(reason=f".exe by {actor.id}")
+        elif name == "slowmode":
+            seconds = args[0]
+            if not isinstance(seconds, int) or not 0 <= seconds <= 21600:
+                raise ScriptError("slowmode must be an integer from 0 to 21600 seconds.")
+            if not isinstance(ctx.channel, discord.TextChannel):
+                raise ScriptError("slowmode only works in a text channel.")
+            await ctx.channel.edit(slowmode_delay=seconds, reason=f".exe by {actor.id}")
+        elif name == "clear":
+            count = args[0]
+            if not isinstance(count, int) or not 1 <= count <= 100:
+                raise ScriptError("clear accepts an integer from 1 to 100.")
+            if not isinstance(ctx.channel, discord.TextChannel):
+                raise ScriptError("clear only works in a text channel.")
+            await ctx.channel.purge(limit=count, reason=f".exe by {actor.id}")
+
     async def run_source(ctx: commands.Context, source: str) -> bool:
         try:
             instructions = parse_script(source, max_actions=settings.max_script_actions)
@@ -61,6 +172,8 @@ def build_bot(settings: Settings) -> ExeBot:
                         action.text,
                         allowed_mentions=discord.AllowedMentions.none(),
                     )
+                elif isinstance(action, DiscordAction):
+                    await execute_discord_action(ctx, action)
 
         try:
             await asyncio.wait_for(execute_actions(), timeout=settings.script_timeout_seconds)
@@ -68,6 +181,8 @@ def build_bot(settings: Settings) -> ExeBot:
             return True
         except TimeoutError:
             await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
+        except ScriptError as exc:
+            await ctx.reply(f"Action refused: {exc}", mention_author=False)
         except discord.Forbidden:
             await ctx.reply("I do not have permission to perform that action here.", mention_author=False)
         except discord.HTTPException:
