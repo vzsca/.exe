@@ -23,7 +23,7 @@ Implemented:
 - Limits on script size, action count, message size, repeat count/depth, and execution time.
 - Create and save named scripts directly in Discord after syntax validation.
 - List, run, and delete a user's own saved scripts; saved scripts are revalidated and use the same execution limits as direct scripts.
-- Script-generated messages cannot ping users or roles.
+- Script-generated messages cannot ping users or @everyone. Role pings are only allowed when explicitly written in an f-string using an exact role name or role ID; text collected through `input()` is escaped and cannot trigger role pings.
 - Automated parser and storage tests, plus a GitHub Actions test workflow.
 
 Still to build: richer values and expressions, event-handler commands and execution, and `sudo` verification.
