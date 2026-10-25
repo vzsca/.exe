@@ -11,6 +11,7 @@ Both syntaxes compile into the same internal instruction types and use the same 
 
 Implemented:
 - `send("Hello")` / compact `m("Hello")` to send a message.
+- Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `create_role`, `delete_role`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
 - `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
@@ -24,7 +25,7 @@ Implemented:
 - Script-generated messages cannot ping users or roles.
 - Automated parser and storage tests, plus a GitHub Actions test workflow.
 
-Still to build: richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
+Still to build: richer values and expressions, event-handler commands and execution, and `sudo` verification.
 
 ## Syntax examples
 
@@ -51,6 +52,24 @@ E(m("Not matched"))
 ```
 
 For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons can also separate instructions on a single line.
+
+### Discord action examples
+
+```text
+ban("123456789012345678", "Spam")
+unban("123456789012345678")
+kick("123456789012345678", "Spam")
+timeout("123456789012345678", 10)
+untimeout("123456789012345678")
+create_role("Helpers")
+delete_role("123456789012345678")
+create_channel("welcome")
+delete_channel("123456789012345678")
+slowmode(5)
+clear(25)
+```
+
+These actions require the matching native Discord permission from both the user running the script and the bot. Role hierarchy is checked for member moderation and role deletion. IDs or exact role/channel names are accepted for deletion; user targets should be Discord IDs. `timeout` duration is 1–40320 minutes, `slowmode` is 0–21600 seconds, and `clear` is limited to 1–100 recent messages. These functions only work in a server. Use them carefully: role/channel deletion and message clearing are destructive.
 
 ## Security principles
 
