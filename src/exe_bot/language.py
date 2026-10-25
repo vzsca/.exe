@@ -280,6 +280,27 @@ def _parse_one(
             raise ScriptError(f"Line {line_number}: if body cannot be empty")
         return [IfEquals(variables[variable_name] == expected, tuple(body))]
 
+    loop_match = re.fullmatch(rf"repeat\\s+(\\d+)\\s+as\\s+({_NAME})\\s*:\\s*(.+)", statement)
+    if loop_match:
+        raw_count, loop_name, body_source = loop_match.groups()
+        count = int(raw_count)
+        if not 1 <= count <= _MAX_REPEAT:
+            raise ScriptError(f"Line {line_number}: repeat count must be between 1 and {_MAX_REPEAT}")
+        expanded: list[Instruction] = []
+        original = variables.get(loop_name, None)
+        had_original = loop_name in variables
+        for loop_value in range(1, count + 1):
+            variables[loop_name] = loop_value
+            loop_body = _parse_body(body_source.strip(), line_number, variables, depth + 1)
+            if not loop_body:
+                raise ScriptError(f"Line {line_number}: repeat body cannot be empty")
+            expanded.extend(loop_body)
+        if had_original:
+            variables[loop_name] = original
+        else:
+            variables.pop(loop_name, None)
+        return expanded
+
     match = _REPEAT_STANDARD.fullmatch(statement) or _REPEAT_COMPACT.fullmatch(statement)
     if match:
         raw_count, body_source = match.groups()
@@ -336,7 +357,14 @@ def _parse_one(
                     for arg in call.args:
                         if not isinstance(arg, ast.Constant) or not isinstance(arg.value, (str, int)) or isinstance(arg.value, bool):
                             raise ScriptError(f"Line {line_number}: create_role arguments in f-strings must be quoted text or integers")
-                        args.append(arg.value)
+                        arg_value = arg.value
+                        if isinstance(arg_value, str):
+                            arg_value = re.sub(
+                                r"{([A-Za-z_][A-Za-z0-9_]*)}",
+                                lambda match: str(variables[match.group(1)]) if match.group(1) in variables else match.group(0),
+                                arg_value,
+                            )
+                        args.append(arg_value)
                     result_name = f"__exe_result_{len(deferred_actions)}"
                     deferred_actions.append(DiscordAction("create_role", tuple(args), result_name))
                     chunks.append(f"__EXE_VAR_{result_name}__")
