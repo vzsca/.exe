@@ -47,6 +47,25 @@ def test_compact_variables_match_standard_semantics():
     assert expand_actions(standard) == expand_actions(compact)
 
 
+
+def test_compact_section_separator_acts_like_newline():
+    source = 'v(greeting, "hello")§m(greeting)§R(2, m("again"))'
+    program = parse_script(source)
+    assert expand_actions(program) == [
+        SendMessage("hello"),
+        SendMessage("again"),
+        SendMessage("again"),
+    ]
+
+
+def test_section_separator_inside_quoted_text_is_preserved():
+    program = parse_script('m("left§right")§m("next")')
+    assert expand_actions(program) == [
+        SendMessage("left§right"),
+        SendMessage("next"),
+    ]
+
+
 def test_standard_and_compact_repeat_match():
     standard = parse_script('repeat 3: send("go")')
     compact = parse_script('R(3, m("go"))')
