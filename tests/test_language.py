@@ -2,6 +2,7 @@ import pytest
 
 from exe_bot.language import (
     ScriptError,
+    DiscordAction,
     SendMessage,
     SetVariable,
     expand_actions,
@@ -152,3 +153,31 @@ def test_compact_else_is_skipped_when_condition_is_true():
 def test_compact_else_without_condition_is_rejected():
     with pytest.raises(ScriptError, match="else must immediately follow"):
         parse_script('E(m("denied"))')
+
+
+@pytest.mark.parametrize('source, expected', [
+    ('ban("123456789012345678", "spam")', DiscordAction('ban', ('123456789012345678', 'spam'))),
+    ('unban("123456789012345678")', DiscordAction('unban', ('123456789012345678',))),
+    ('kick("123456789012345678", "spam")', DiscordAction('kick', ('123456789012345678', 'spam'))),
+    ('timeout("123456789012345678", 10)', DiscordAction('timeout', ('123456789012345678', 10))),
+    ('untimeout("123456789012345678")', DiscordAction('untimeout', ('123456789012345678',))),
+    ('create_role("Helpers")', DiscordAction('create_role', ('Helpers',))),
+    ('delete_role("123456789012345678")', DiscordAction('delete_role', ('123456789012345678',))),
+    ('create_channel("general")', DiscordAction('create_channel', ('general',))),
+    ('delete_channel("123456789012345678")', DiscordAction('delete_channel', ('123456789012345678',))),
+    ('slowmode(5)', DiscordAction('slowmode', (5,))),
+    ('clear(25)', DiscordAction('clear', (25,))),
+])
+def test_discord_actions_parse_to_explicit_instructions(source, expected):
+    assert parse_script(source) == [expected]
+    assert expand_actions(parse_script(source)) == [expected]
+
+
+def test_unknown_function_is_not_allowed():
+    with pytest.raises(ScriptError, match='unknown instruction'):
+        parse_script('run_python("print(1)")')
+
+
+def test_discord_action_counts_towards_action_limit():
+    with pytest.raises(ScriptError, match='limit of 1'):
+        parse_script('clear(5)\nban("123456789012345678", "reason")', max_actions=1)
