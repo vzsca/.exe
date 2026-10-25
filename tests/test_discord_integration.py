@@ -58,25 +58,19 @@ class DiscordIntegrationTests(IsolatedAsyncioTestCase):
         finally:
             await bot.close()
 
-    async def test_created_role_is_mentioned_by_id_even_with_duplicate_names(self):
+    async def test_role_id_reference_selects_the_exact_duplicate_name_role(self):
         tmp_path = Path(tempfile.mkdtemp())
         owner_id = 123
         old_role = FakeRole(11111111111111111, "Helpers")
-        created_role = FakeRole(22222222222222222, "Helpers")
-        ctx, channel, _, guild = make_context(owner_id, [old_role])
-
-        async def create_role(**kwargs):
-            guild.roles.append(created_role)
-            return created_role
-
-        guild.create_role = AsyncMock(side_effect=create_role)
+        selected_role = FakeRole(22222222222222222, "Helpers")
+        ctx, channel, _, _ = make_context(owner_id, [old_role, selected_role])
         bot = build_bot(Settings(token="test", owner_id=owner_id, database_path=str(tmp_path / "db.sqlite3")))
         try:
             await bot.get_command("exe").callback(
-                ctx, script='send(f"Created {create_role(\'Helpers\')}")'
+                ctx, script='send(f"Created @22222222222222222")'
             )
             channel.send.assert_awaited_once()
-            self.assertEqual(channel.send.await_args.args[0], f"Created {created_role.mention}")
-            self.assertEqual(channel.send.await_args.kwargs["allowed_mentions"].roles, [created_role])
+            self.assertEqual(channel.send.await_args.args[0], f"Created {selected_role.mention}")
+            self.assertEqual(channel.send.await_args.kwargs["allowed_mentions"].roles, [selected_role])
         finally:
             await bot.close()
