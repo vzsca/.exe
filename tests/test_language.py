@@ -166,6 +166,8 @@ def test_compact_else_without_condition_is_rejected():
     ('create_role("Helpers", "#5865F2", "view_channel, send_messages")', DiscordAction('create_role', ('Helpers', '#5865F2', 'view_channel, send_messages'))),
     ('delete_role("123456789012345678")', DiscordAction('delete_role', ('123456789012345678',))),
     ('create_channel("general")', DiscordAction('create_channel', ('general',))),
+    ('create_channel("staff", "Staff")', DiscordAction('create_channel', ('staff', 'Staff'))),
+    ('create_channel("staff", "Staff", "@everyone:view_channel=deny, Moderators:view_channel=allow")', DiscordAction('create_channel', ('staff', 'Staff', '@everyone:view_channel=deny, Moderators:view_channel=allow'))),
     ('delete_channel("123456789012345678")', DiscordAction('delete_channel', ('123456789012345678',))),
     ('slowmode(5)', DiscordAction('slowmode', (5,))),
     ('clear(25)', DiscordAction('clear', (25,))),
