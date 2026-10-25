@@ -14,6 +14,16 @@ from .storage import Database, StorageError
 
 log = logging.getLogger(__name__)
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
+_SAVE_RE = re.compile(r"^save\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s*::\s*(.+)$", re.IGNORECASE | re.DOTALL)
+_NAME_COMMAND_RE = re.compile(r"^(run|delete)\s+([A-Za-z][A-Za-z0-9_-]{0,31})$", re.IGNORECASE)
+
+
+def _strip_fence(source: str) -> str:
+    cleaned = source.strip()
+    if cleaned.startswith("```") and cleaned.endswith("```"):
+        lines = cleaned.splitlines()
+        return "\n".join(lines[1:-1]).strip()
+    return cleaned
 
 
 class ExeBot(commands.Bot):
@@ -35,9 +45,38 @@ def build_bot(settings: Settings) -> ExeBot:
     async def on_ready() -> None:
         log.info("Connected as %s (ID: %s)", bot.user, bot.user.id if bot.user else "unknown")
 
+    async def run_source(ctx: commands.Context, source: str) -> bool:
+        try:
+            instructions = parse_script(source, max_actions=settings.max_script_actions)
+            actions = expand_actions(instructions)
+        except ScriptError as exc:
+            await ctx.reply(f"Syntax error: {exc}", mention_author=False)
+            return False
+
+        async def execute_actions() -> None:
+            for action in actions:
+                if isinstance(action, SendMessage):
+                    # Script-generated messages never ping users or roles.
+                    await ctx.channel.send(
+                        action.text,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+
+        try:
+            await asyncio.wait_for(execute_actions(), timeout=settings.script_timeout_seconds)
+            await ctx.message.add_reaction("✅")
+            return True
+        except TimeoutError:
+            await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
+        except discord.Forbidden:
+            await ctx.reply("I do not have permission to perform that action here.", mention_author=False)
+        except discord.HTTPException:
+            await ctx.reply("Discord rejected an action in this script.", mention_author=False)
+        return False
+
     @bot.command(name="exe")
     async def exe_command(ctx: commands.Context, *, script: str = "") -> None:
-        """Run a script or use owner-only admin subcommands."""
+        """Run a script or use script-storage / owner-only admin commands."""
         cleaned = script.strip()
 
         # Owner-only access management is handled before the script whitelist check.
@@ -100,48 +139,73 @@ def build_bot(settings: Settings) -> ExeBot:
 
         if not may_run_scripts(ctx.author.id, settings, bot.db.list_whitelist()):
             await ctx.reply(
-                "Access denied: you are not allowed to run .exe scripts.",
+                "Access denied: you are not allowed to use .exe scripts.",
                 mention_author=False,
             )
             return
 
-        if cleaned.startswith(chr(96) * 3) and cleaned.endswith(chr(96) * 3):
-            lines = cleaned.splitlines()
-            cleaned = "\n".join(lines[1:-1])
-
-        try:
-            instructions = parse_script(cleaned, max_actions=settings.max_script_actions)
-            actions = expand_actions(instructions)
-        except ScriptError as exc:
-            await ctx.reply(f"Syntax error: {exc}", mention_author=False)
+        # Save a validated script without executing it.
+        save_match = _SAVE_RE.fullmatch(cleaned)
+        if save_match:
+            name, source = save_match.groups()
+            source = _strip_fence(source)
+            try:
+                parse_script(source, max_actions=settings.max_script_actions)
+                bot.db.save_script(ctx.author.id, name, source)
+            except (ScriptError, StorageError) as exc:
+                await ctx.reply(f"Could not save script: {exc}", mention_author=False)
+                return
+            await ctx.reply(
+                f"Script `{name}` saved. Use !exe run {name} to execute it.",
+                mention_author=False,
+            )
             return
 
-        async def execute_actions() -> None:
-            for action in actions:
-                if isinstance(action, SendMessage):
-                    # Script-generated messages never ping users or roles.
-                    await ctx.channel.send(
-                        action.text,
-                        allowed_mentions=discord.AllowedMentions.none(),
-                    )
+        if cleaned.lower() == "list":
+            names = bot.db.list_scripts(ctx.author.id)
+            response = (
+                "You have no saved scripts. Create one with !exe save name :: send(\"Hello\")."
+                if not names
+                else "Your scripts: " + ", ".join(f"`{name}`" for name in names)
+            )
+            await ctx.reply(response, mention_author=False)
+            return
 
-        try:
-            await asyncio.wait_for(execute_actions(), timeout=settings.script_timeout_seconds)
-            await ctx.message.add_reaction("✅")
-        except TimeoutError:
-            await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
-        except discord.Forbidden:
-            await ctx.reply("I do not have permission to perform that action here.", mention_author=False)
-        except discord.HTTPException:
-            await ctx.reply("Discord rejected an action in this script.", mention_author=False)
+        name_match = _NAME_COMMAND_RE.fullmatch(cleaned)
+        if name_match:
+            operation, name = name_match.groups()
+            operation = operation.lower()
+            try:
+                if operation == "run":
+                    source = bot.db.get_script(ctx.author.id, name)
+                    if source is None:
+                        await ctx.reply(f"No saved script named `{name}` found for your account.", mention_author=False)
+                        return
+                    await run_source(ctx, source)
+                else:
+                    deleted = bot.db.delete_script(ctx.author.id, name)
+                    await ctx.reply(
+                        f"Script `{name}` deleted." if deleted else f"No saved script named `{name}` found.",
+                        mention_author=False,
+                    )
+            except StorageError as exc:
+                await ctx.reply(str(exc), mention_author=False)
+            return
+
+        # A plain !exe message runs the source directly.
+        await run_source(ctx, _strip_fence(cleaned))
 
     @bot.command(name="help_exe")
     async def help_exe(ctx: commands.Context) -> None:
         await ctx.reply(
-            'Standard: !exe let greeting = "Hello"; send(greeting)\n'
-            'Compact: !exe v(greeting, "Hello"); m(greeting)\n'
+            'Run: !exe send("Hello")\n'
+            'Save: !exe save greeting :: send("Hello")\n'
+            'Run saved: !exe run greeting\n'
+            'List / delete: !exe list / !exe delete greeting\n'
+            'Standard: let greeting = "Hello"; send(greeting)\n'
+            'Compact: v(greeting, "Hello"); m(greeting)\n'
             'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
-            "Owner whitelist: !exe admin add @user, remove @user, list.",
+            'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.',
             mention_author=False,
         )
 
