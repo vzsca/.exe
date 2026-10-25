@@ -32,6 +32,7 @@ class ExeBot(commands.Bot):
     def __init__(self, settings: Settings) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.members = True
         super().__init__(command_prefix="!", intents=intents, help_command=None)
         self.settings = settings
         self.db = Database(settings.database_path)
@@ -53,6 +54,22 @@ def build_bot(settings: Settings) -> ExeBot:
             raise ScriptError("Discord administration functions only work inside a server.")
         guild = ctx.guild
         actor = ctx.author
+        if name in {"guilds_roles", "guilds_members", "guilds_channels", "guilds_categories"}:
+            if name == "guilds_roles":
+                entries = [f"{role.name} (ID: {role.id})" for role in sorted(guild.roles, key=lambda item: item.position, reverse=True)]
+            elif name == "guilds_members":
+                try:
+                    members = [member async for member in guild.fetch_members(limit=100)]
+                except discord.Forbidden as exc:
+                    raise ScriptError("Could not list members. Enable Server Members Intent in the Discord Developer Portal and restart the bot.") from exc
+                entries = [f"{member.display_name} (ID: {member.id})" for member in members]
+            elif name == "guilds_channels":
+                entries = [f"#{channel.name} (ID: {channel.id})" for channel in sorted(guild.channels, key=lambda item: item.position) if not isinstance(channel, discord.CategoryChannel)]
+            else:
+                entries = [f"{category.name} (ID: {category.id})" for category in sorted(guild.categories, key=lambda item: item.position)]
+            safe_entries = [entry.replace("@", "@\\u200b") for entry in entries]
+            suffix = "\\n… liste limitée à 100 éléments." if name == "guilds_members" and len(entries) >= 100 else ""
+            return ("\\n".join(safe_entries) if safe_entries else "(aucun élément)") + suffix
         if not isinstance(actor, discord.Member):
             raise ScriptError("Could not verify your server permissions.")
         bot_member = guild.me
@@ -579,6 +596,8 @@ def build_bot(settings: Settings) -> ExeBot:
             'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
             'Server actions: ban(id, "reason"), unban(id), kick(id, "reason"), timeout(id, minutes), untimeout(id)\n'
             'Roles/channels: create_role("name"), delete_role(id_or_exact_name), create_channel("name"), delete_channel(id_or_exact_name)\n'
+            'Read-only lists: send(f"{guilds_roles()}"), guilds_members(), guilds_channels(), guilds_categories()\n'
+            'Member list requires Server Members Intent; output is capped at 100 members.\n'
             'Moderation: slowmode(seconds), clear(count); requires matching Discord permissions and bot role access.\n'
             'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.',
             mention_author=False,
