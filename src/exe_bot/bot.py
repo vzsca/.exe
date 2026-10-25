@@ -15,7 +15,6 @@ from .storage import Database, StorageError
 log = logging.getLogger(__name__)
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
 _CREATE_RE = re.compile(r"^create\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s*::\s*(.+)$", re.IGNORECASE | re.DOTALL)
-_NAME_COMMAND_RE = re.compile(r"^(run|delete)\s+([A-Za-z][A-Za-z0-9_-]{0,31})$", re.IGNORECASE)
 
 
 def _strip_fence(source: str) -> str:
@@ -168,9 +167,8 @@ def build_bot(settings: Settings) -> ExeBot:
     async def help_exe(ctx: commands.Context) -> None:
         await ctx.reply(
             'Run: !exe send("Hello")\n'
-            'Save: !exe save greeting :: send("Hello")\n'
-            'Run saved: !exe run greeting\n'
-            'List / delete: !exe list / !exe delete greeting\n'
+            'Create and save: !exe create greeting :: send("Hello")\n'
+            'Saved-script running and management are not implemented yet.\n'
             'Standard: let greeting = "Hello"; send(greeting)\n'
             'Compact: v(greeting, "Hello"); m(greeting)\n'
             'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
