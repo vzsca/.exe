@@ -278,6 +278,79 @@ def _parse_one(
     )
 
 
+def _normalize_indented_blocks(source: str) -> str:
+    """Convert indentation-based repeat/if/else blocks to the existing safe inline grammar."""
+    lines = source.expandtabs(4).splitlines()
+    parsed_lines: list[tuple[int, str, int]] = []
+    for number, raw in enumerate(lines, start=1):
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if raw[:indent].strip():
+            raise ScriptError(f"Line {number}: indentation must use spaces")
+        parsed_lines.append((indent, stripped, number))
+
+    def parse_level(index: int, parent_indent: int) -> tuple[list[str], int]:
+        result: list[str] = []
+        while index < len(parsed_lines):
+            indent, text, line_no = parsed_lines[index]
+            if indent <= parent_indent:
+                break
+            if indent < parent_indent:
+                break
+            is_block = text.endswith(":") and (
+                re.fullmatch(r"repeat\\s+\\d+\\s*:", text)
+                or re.fullmatch(rf"if\\s+{_NAME}\\s*==\\s*.+:", text)
+                or text == "else:"
+            )
+            if is_block:
+                if index + 1 >= len(parsed_lines) or parsed_lines[index + 1][0] <= indent:
+                    raise ScriptError(f"Line {line_no}: block body cannot be empty")
+                child_indent = parsed_lines[index + 1][0]
+                children, next_index = parse_level(index + 1, indent)
+                if not children:
+                    raise ScriptError(f"Line {line_no}: block body cannot be empty")
+                result.append(text[:-1].rstrip() + ": " + "§".join(children))
+                index = next_index
+            else:
+                if indent > parent_indent and result and parsed_lines[index - 1][0] < indent:
+                    # A deeper indentation is only valid as the body of a block.
+                    previous = parsed_lines[index - 1][1]
+                    if not previous.endswith(":"):
+                        raise ScriptError(f"Line {line_no}: unexpected indentation")
+                result.append(text)
+                index += 1
+        return result, index
+
+    if not parsed_lines:
+        return source
+    # At top level, the first line may have no indentation; all top-level lines
+    # must share that indentation to avoid silently accepting malformed blocks.
+    base_indent = parsed_lines[0][0]
+    output: list[str] = []
+    index = 0
+    while index < len(parsed_lines):
+        indent, text, line_no = parsed_lines[index]
+        if indent != base_indent:
+            raise ScriptError(f"Line {line_no}: unexpected indentation")
+        if text.endswith(":") and (
+            re.fullmatch(r"repeat\\s+\\d+\\s*:", text)
+            or re.fullmatch(rf"if\\s+{_NAME}\\s*==\\s*.+:", text)
+            or text == "else:"
+        ):
+            if index + 1 >= len(parsed_lines) or parsed_lines[index + 1][0] <= indent:
+                raise ScriptError(f"Line {line_no}: block body cannot be empty")
+            children, index = parse_level(index + 1, indent)
+            if not children:
+                raise ScriptError(f"Line {line_no}: block body cannot be empty")
+            output.append(text[:-1].rstrip() + ": " + "§".join(children))
+        else:
+            output.append(text)
+            index += 1
+    return "\\n".join(output)
+
+
 def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     """Parse standard and compact syntax to shared, validated instructions."""
     if len(source) > 8000:
