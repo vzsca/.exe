@@ -277,11 +277,16 @@ def build_bot(settings: Settings) -> ExeBot:
                     overwrite = overwrites.setdefault(target, discord.PermissionOverwrite())
                     setattr(overwrite, permission, decision == "allow")
 
+            # discord.py does not accept sync_permissions on create_text_channel.
+            # Copy the category overwrites when none were explicitly supplied so the
+            # new channel inherits the category access rules.
+            if category is not None and not overwrites:
+                overwrites = category.overwrites
+
             await guild.create_text_channel(
                 channel_name,
                 category=category,
                 overwrites=overwrites or None,
-                sync_permissions=bool(category and not overwrites),
                 reason=f".exe by {actor.id}",
             )
         elif name == "delete_channel":
