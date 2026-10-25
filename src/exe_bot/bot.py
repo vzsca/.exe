@@ -4,6 +4,7 @@ import asyncio
 import logging
 from datetime import timedelta
 import re
+import time
 
 import discord
 from discord.ext import commands
@@ -318,37 +319,75 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.reply(f"Syntax error: {exc}", mention_author=False)
             return False
 
+        current_action = {"index": 0, "name": "not started"}
+        log.info(".exe script parsed: %d actions (channel=%s actor=%s timeout=%ss)",
+                 len(actions), ctx.channel.id, ctx.author.id, settings.script_timeout_seconds)
+
         async def execute_actions() -> None:
-            for action in actions:
-                if isinstance(action, SendMessage):
-                    # Script-generated messages never ping users or roles.
-                    await ctx.channel.send(
-                        action.text,
-                        allowed_mentions=discord.AllowedMentions.none(),
-                    )
-                elif isinstance(action, DiscordAction):
-                    try:
-                        await execute_discord_action(ctx, action)
-                    except discord.Forbidden as exc:
-                        log.warning(
-                            "Discord denied .exe action %s in guild %s (channel %s), actor %s, target args %r: %s",
-                            action.name,
-                            ctx.guild.id if ctx.guild else "DM",
-                            ctx.channel.id,
-                            ctx.author.id,
-                            action.arguments,
-                            getattr(exc, "text", str(exc)),
+            for index, action in enumerate(actions, start=1):
+                action_name = "send" if isinstance(action, SendMessage) else action.name
+                current_action.update(index=index, name=action_name)
+                started = time.monotonic()
+                log.info(".exe action %d/%d starting: %s (channel=%s actor=%s)",
+                         index, len(actions), action_name, ctx.channel.id, ctx.author.id)
+                try:
+                    if isinstance(action, SendMessage):
+                        target = ctx.channel
+                        if action.channel is not None:
+                            if ctx.guild is None:
+                                raise ScriptError("Target-channel sends only work inside a server.")
+                            raw_target = action.channel.removeprefix("#")
+                            target = (ctx.guild.get_channel(int(raw_target)) if raw_target.isdigit()
+                                      else discord.utils.get(ctx.guild.text_channels, name=raw_target))
+                            if not isinstance(target, discord.TextChannel):
+                                raise ScriptError("Could not find the target text channel by ID or exact name.")
+                        content = action.text
+                        allowed_roles = []
+                        if action.role_mentions:
+                            if ctx.guild is None:
+                                raise ScriptError("Role mentions only work inside a server.")
+                            role_pattern = re.compile(r"@([A-Za-z0-9_-][A-Za-z0-9_ -]{0,99}?)(?=\\s|$|[,!.?:;])")
+                            def replace_role(match: re.Match[str]) -> str:
+                                raw_role = match.group(1).strip()
+                                role = (ctx.guild.get_role(int(raw_role)) if raw_role.isdigit()
+                                        else discord.utils.get(ctx.guild.roles, name=raw_role))
+                                if role is None:
+                                    return match.group(0)
+                                allowed_roles.append(role)
+                                return role.mention
+                            content = role_pattern.sub(replace_role, content)
+                        await target.send(
+                            content,
+                            allowed_mentions=discord.AllowedMentions(
+                                everyone=False, users=False, roles=allowed_roles, replied_user=False
+                            ),
                         )
-                        raise ScriptError(
-                            f"Discord refused '{action.name}'. Verify the bot's Moderate Members permission "
-                            "and that its role is above the target member. Check the bot logs for details."
-                        ) from exc
+                    elif isinstance(action, DiscordAction):
+                        try:
+                            await execute_discord_action(ctx, action)
+                        except discord.Forbidden as exc:
+                            log.warning(
+                                "Discord denied .exe action %s in guild %s (channel %s), actor %s, target args %r: %s",
+                                action.name, ctx.guild.id if ctx.guild else "DM", ctx.channel.id,
+                                ctx.author.id, action.arguments, getattr(exc, "text", str(exc)),
+                            )
+                            raise ScriptError(
+                                f"Discord refused '{action.name}'. Verify the bot's permissions and role hierarchy. "
+                                "Check the bot logs for details."
+                            ) from exc
+                finally:
+                    log.info(".exe action %d/%d finished: %s (elapsed=%.2fs, channel=%s actor=%s)",
+                             index, len(actions), action_name, time.monotonic() - started,
+                             ctx.channel.id, ctx.author.id)
 
         try:
             await asyncio.wait_for(execute_actions(), timeout=settings.script_timeout_seconds)
             await ctx.message.add_reaction("✅")
             return True
         except TimeoutError:
+            log.warning(".exe script timed out after %ss at action %s/%s (channel=%s actor=%s)",
+                        settings.script_timeout_seconds, current_action["index"], len(actions),
+                        ctx.channel.id, ctx.author.id)
             await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
         except ScriptError as exc:
             await ctx.reply(f"Action refused: {exc}", mention_author=False)
