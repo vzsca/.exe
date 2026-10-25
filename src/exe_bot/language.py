@@ -108,7 +108,7 @@ def _split_statements(source: str) -> list[tuple[int, str]]:
                     quote = char
                 elif quote == char:
                     quote = None
-            if char == ";" and quote is None:
+            if char in (";", "§") and quote is None:
                 parts.append("".join(current).strip())
                 current = []
             else:
