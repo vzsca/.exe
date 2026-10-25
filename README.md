@@ -1,32 +1,59 @@
 # `.exe` — Linux-inspired scripting for Discord
 
-`.exe` is a Discord bot project built from scratch. It aims to provide a small, sandboxed scripting language for Discord actions, with two native syntaxes:
+`.exe` is a Discord bot project built from scratch. It provides the beginnings of a small, sandboxed scripting language for Discord actions, with two native syntaxes:
 
 - **Standard**: readable and beginner-friendly.
 - **Compact**: shorter, symbol-heavy syntax for experienced users.
 
-Both syntaxes must compile to the same internal representation and use the same execution engine, permission checks, limits, and security rules.
+Both syntaxes compile into the same internal instruction types and use the same execution engine, permissions, limits, and security rules.
 
-## Status
+## Current prototype
 
-Early foundation. The current prototype supports only sending a text message, using either `send("Hello")` or compact `m("Hello")`. Variables, control flow, Discord administration actions, persistent scripts, event handlers, and `sudo` verification are not implemented yet.
+Implemented:
+- `send("Hello")` / compact `m("Hello")` to send a message.
+- `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
+- `send(greeting)` / compact `m(greeting)` to use a defined variable.
+- `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
+- Owner-ID and whitelist access checks.
+- Limits on script size, action count, message size, repeat count/depth, and execution time.
+- Script-generated messages cannot ping users or roles.
+- Automated parser tests and a GitHub Actions test workflow.
+
+Still to build: conditionals, richer values and expressions, Discord administration actions, custom commands/events saved in SQLite, owner-only whitelist management commands, and `sudo` verification.
+
+## Syntax examples
+
+Standard:
+
+```text
+let greeting = "Hello"
+send(greeting)
+repeat 3: send(greeting)
+```
+
+Compact:
+
+```text
+v(greeting, "Hello")
+m(greeting)
+R(3, m(greeting))
+```
+
+For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons can also separate instructions on a single line.
 
 ## Security principles
 
 - No `eval`, `exec`, arbitrary Python, OS shell access, or unrestricted file access.
-- Scripts can only call explicitly registered actions.
-- Owner identity is verified using the configured Discord user ID, not server Administrator permissions.
+- Scripts can only call explicitly registered language instructions/actions.
+- Owner identity is verified using `OWNER_ID`, not server Administrator permissions.
 - Whitelist access does not grant owner privileges.
-- Script size, action count, message size, and runtime are limited.
-- Script-generated messages do not trigger user or role mentions.
 - Secrets belong in `.env`, never in source control.
+- Script execution has configured time and action limits.
 
-## Requirements
+## Requirements and setup
 
 - Python 3.12 or newer
 - A Discord bot application and token
-
-## Setup
 
 1. Clone the repository and enter its folder.
 2. Create and activate a virtual environment.
@@ -37,18 +64,9 @@ Early foundation. The current prototype supports only sending a text message, us
 
 Run tests with `python -m pip install -r requirements-dev.txt`, then `python -m pytest`.
 
-## Test syntax
-
-- Standard: `!exe send("Hello")`
-- Compact: `!exe m("Hello")`
-
-For a multiline script, put the instructions in a fenced code block after `!exe`.
-
-The language is intentionally limited at this stage. Unsupported instructions return a line-specific syntax error instead of being executed as Python.
-
 ## Planned command concepts
 
-- `!exe <script>` — run a short script.
+- `!exe <script>` — run a script.
 - `!exe admin add @user` — owner-only whitelist management.
 - `sudo` — additional confirmation for sensitive owner actions.
 
