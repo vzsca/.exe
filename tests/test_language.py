@@ -354,7 +354,7 @@ def test_list_and_dictionary_are_bounded():
 
 def test_indented_counted_loop_supports_counter_interpolation():
     program = parse_script(
-        'repeat 3 as i:\\n'
+        'repeat 3 as i:\n'
         '    send(f"item {i}")'
     )
     assert expand_actions(program) == [
