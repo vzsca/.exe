@@ -135,7 +135,44 @@ def build_bot(settings: Settings) -> ExeBot:
             role_name = str(args[0]).strip()
             if not role_name or len(role_name) > 100:
                 raise ScriptError("Role name must contain 1 to 100 characters.")
-            await guild.create_role(name=role_name, reason=f".exe by {actor.id}")
+
+            role_color = discord.Color.default()
+            if len(args) >= 2:
+                raw_color = str(args[1]).strip()
+                if not re.fullmatch(r"#?[0-9A-Fa-f]{6}", raw_color):
+                    raise ScriptError('Role color must be a hex color like "#5865F2".')
+                role_color = discord.Color(int(raw_color.removeprefix("#"), 16))
+
+            # Keep role permissions explicit and limited; do not allow administrator.
+            allowed_role_permissions = {
+                "view_channel", "send_messages", "read_message_history",
+                "embed_links", "attach_files", "add_reactions", "use_external_emojis",
+                "connect", "speak", "stream", "use_voice_activation",
+                "manage_messages", "manage_nicknames", "kick_members", "ban_members",
+                "moderate_members", "view_audit_log",
+            }
+            role_permissions = discord.Permissions.none()
+            if len(args) >= 3:
+                raw_permissions = str(args[2]).strip()
+                if raw_permissions:
+                    requested = [permission.strip().lower() for permission in raw_permissions.split(",")]
+                    if any(not permission for permission in requested):
+                        raise ScriptError("Separate role permissions with commas, without empty entries.")
+                    unsupported = sorted(set(requested) - allowed_role_permissions)
+                    if unsupported:
+                        raise ScriptError(
+                            "Unsupported role permission(s): " + ", ".join(unsupported)
+                            + ". 'administrator' and other high-risk permissions are not allowed."
+                        )
+                    for permission in set(requested):
+                        setattr(role_permissions, permission, True)
+
+            await guild.create_role(
+                name=role_name,
+                colour=role_color,
+                permissions=role_permissions,
+                reason=f".exe by {actor.id}",
+            )
         elif name == "delete_role":
             raw = str(args[0])
             role = guild.get_role(int(raw)) if raw.isdigit() else discord.utils.get(guild.roles, name=raw)
