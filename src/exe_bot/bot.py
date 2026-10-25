@@ -72,10 +72,9 @@ def build_bot(settings: Settings) -> ExeBot:
     @bot.command(name="help_exe")
     async def help_exe(ctx: commands.Context) -> None:
         await ctx.reply(
-            "`.exe` prototype syntax:\n"
-            "Standard: `!exe let greeting = \\"Hello\\"; send(greeting)`\n"
-            "Compact: `!exe v(greeting, \\"Hello\\"); m(greeting)`\n"
-            "Repeat: `repeat 3: send(greeting)` or `R(3, m(greeting))`\n"
+            'Standard: `!exe let greeting = "Hello"; send(greeting)`\n'
+            'Compact: `!exe v(greeting, "Hello"); m(greeting)`\n'
+            'Repeat: `repeat 3: send(greeting)` or `R(3, m(greeting))`\n'
             "Both forms use the same safe instruction engine.",
             mention_author=False,
         )
