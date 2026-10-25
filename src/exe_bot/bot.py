@@ -2,15 +2,18 @@
 
 import asyncio
 import logging
+import re
 
 import discord
 from discord.ext import commands
 
 from .config import Settings
 from .language import ScriptError, SendMessage, expand_actions, parse_script
-from .permissions import may_run_scripts
+from .permissions import is_owner, may_run_scripts
+from .storage import Database, StorageError
 
 log = logging.getLogger(__name__)
+_USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
 
 
 class ExeBot(commands.Bot):
@@ -19,6 +22,7 @@ class ExeBot(commands.Bot):
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents, help_command=None)
         self.settings = settings
+        self.db = Database(settings.database_path)
 
     async def setup_hook(self) -> None:
         log.info(".exe scripting bot is starting")
@@ -33,13 +37,75 @@ def build_bot(settings: Settings) -> ExeBot:
 
     @bot.command(name="exe")
     async def exe_command(ctx: commands.Context, *, script: str = "") -> None:
-        """Run a short .exe script. Use a code block for multiple lines."""
-        if not may_run_scripts(ctx.author.id, settings):
-            await ctx.reply("Access denied: you are not allowed to run `.exe` scripts.", mention_author=False)
+        """Run a script or use owner-only admin subcommands."""
+        cleaned = script.strip()
+
+        # Owner-only access management is handled before the script whitelist check.
+        if cleaned.lower().startswith("admin"):
+            if not is_owner(ctx.author.id, settings):
+                await ctx.reply(
+                    "Access denied: only the configured owner can manage the whitelist.",
+                    mention_author=False,
+                )
+                return
+
+            if cleaned.lower() == "admin list":
+                ids = bot.db.list_whitelist()
+                if not ids:
+                    response = "Whitelist is empty."
+                else:
+                    visible = ids[:50]
+                    response = "Whitelisted user IDs: " + ", ".join(map(str, visible))
+                    if len(ids) > len(visible):
+                        response += f" (and {len(ids) - len(visible)} more)"
+                await ctx.reply(response, mention_author=False)
+                return
+
+            match = re.fullmatch(r"admin\s+(add|remove)\s+(\S+)", cleaned, flags=re.IGNORECASE)
+            if match:
+                operation, raw_user_id = match.groups()
+                id_match = _USER_ID.fullmatch(raw_user_id)
+                if id_match is None:
+                    await ctx.reply(
+                        "Usage: !exe admin add @user or !exe admin remove @user.",
+                        mention_author=False,
+                    )
+                    return
+                target_id = int(id_match.group(1) or id_match.group(2))
+                try:
+                    if operation.lower() == "add":
+                        changed = bot.db.add_whitelist(target_id, ctx.author.id)
+                        response = (
+                            f"User ID {target_id} added to the whitelist."
+                            if changed
+                            else f"User ID {target_id} is already whitelisted."
+                        )
+                    else:
+                        changed = bot.db.remove_whitelist(target_id)
+                        response = (
+                            f"User ID {target_id} removed from the whitelist."
+                            if changed
+                            else f"User ID {target_id} was not in the whitelist."
+                        )
+                except StorageError as exc:
+                    response = str(exc)
+                await ctx.reply(response, mention_author=False)
+                return
+
+            await ctx.reply(
+                "Owner commands: !exe admin add @user, !exe admin remove @user, !exe admin list.",
+                mention_author=False,
+            )
             return
 
-        cleaned = script.strip()
-        if cleaned.startswith("```") and cleaned.endswith("```"):
+        if not may_run_scripts(ctx.author.id, settings, bot.db.list_whitelist()):
+            await ctx.reply(
+                "Access denied: you are not allowed to run .exe scripts.",
+                mention_author=False,
+            )
+            return
+
+        if cleaned.startswith(chr(96) * 3) and cleaned.endswith(chr(96) * 3):
             lines = cleaned.splitlines()
             cleaned = "\n".join(lines[1:-1])
 
@@ -47,7 +113,7 @@ def build_bot(settings: Settings) -> ExeBot:
             instructions = parse_script(cleaned, max_actions=settings.max_script_actions)
             actions = expand_actions(instructions)
         except ScriptError as exc:
-            await ctx.reply(f"`Syntax error:` {exc}", mention_author=False)
+            await ctx.reply(f"Syntax error: {exc}", mention_author=False)
             return
 
         async def execute_actions() -> None:
@@ -72,10 +138,10 @@ def build_bot(settings: Settings) -> ExeBot:
     @bot.command(name="help_exe")
     async def help_exe(ctx: commands.Context) -> None:
         await ctx.reply(
-            'Standard: `!exe let greeting = "Hello"; send(greeting)`\n'
-            'Compact: `!exe v(greeting, "Hello"); m(greeting)`\n'
-            'Repeat: `repeat 3: send(greeting)` or `R(3, m(greeting))`\n'
-            "Both forms use the same safe instruction engine.",
+            'Standard: !exe let greeting = "Hello"; send(greeting)\n'
+            'Compact: !exe v(greeting, "Hello"); m(greeting)\n'
+            'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
+            "Owner whitelist: !exe admin add @user, remove @user, list.",
             mention_author=False,
         )
 
