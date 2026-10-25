@@ -10,10 +10,11 @@ Both syntaxes compile into the same internal instruction types and use the same 
 ## Current prototype
 
 Implemented:
-- `send("Hello")` / compact `m("Hello")` to send a message.
+- `send("Hello")` / compact `m("Hello")` to send a message. An optional second argument targets a text channel by exact name or ID, e.g. `send("Hello", "#general")` or `send("Hello", "123456789012345678")`.
 - Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `create_role`, `delete_role`, `create_category`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
+- `send(f"Salut @Moderateurs")` allows an explicit role mention by exact role name or ID. F-strings only support literal text and defined variables such as `{greeting}`; they do not execute Python expressions. User and `@everyone` mentions remain blocked.
 - `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
 - `if greeting == "Hello": send("yes")` with an optional following `else: send("no")` line; compact `I(greeting, "Hello", m("yes"))` supports an optional following `E(m("no"))` line for the else branch.
 - Owner-ID and SQLite-backed whitelist access checks.
