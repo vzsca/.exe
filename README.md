@@ -68,11 +68,11 @@ For multiple instructions in Discord, send a fenced code block after `!exe`. Sem
 - A Discord bot application and token
 
 1. Clone the repository and enter its folder.
-2. Create and activate a virtual environment.
-3. Install the project: `python -m pip install -e .`
-4. Copy `.env.example` to `.env` and fill in `DISCORD_TOKEN` and `OWNER_ID`.
+2. On Windows, run `start_bot.bat`; on Linux/macOS, run `chmod +x start_bot.sh && ./start_bot.sh`.
+3. The launcher creates `venv`, installs dependencies, and copies `.env.example` to `.env` if needed.
+4. In the panel, use `set_token` and `set_owner` to configure the bot. The token is entered with hidden input.
 5. In the Discord Developer Portal, enable **Message Content Intent** for the bot.
-6. Start it with `python -m exe_bot`.
+6. Use `start`, `stop`, `restart`, `status`, or `uptime` in the panel. Logs are available with `logs`.
 
 The SQLite file is created automatically at `DATABASE_PATH` (default: `data/exe.sqlite3`).
 
