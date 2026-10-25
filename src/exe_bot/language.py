@@ -468,7 +468,7 @@ def _normalize_indented_blocks(source: str) -> str:
     if not any(indent > parsed_lines[0][0] for indent, _, _ in parsed_lines):
         for position, (indent, text, line_no) in enumerate(parsed_lines):
             is_block = text.endswith(":") and (
-                re.fullmatch(r"repeat\s+\d+\s*:", text)
+                re.fullmatch(r"repeat\s+\d+(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]{0,31})?\s*:", text)
                 or re.fullmatch(rf"if\s+{_NAME}\s*==\s*.+:", text)
                 or text == "else:"
             )
@@ -488,7 +488,7 @@ def _normalize_indented_blocks(source: str) -> str:
         if indent != base_indent:
             raise ScriptError(f"Line {line_no}: unexpected indentation")
         if text.endswith(":") and (
-            re.fullmatch(r"repeat\s+\d+\s*:", text)
+            re.fullmatch(r"repeat\s+\d+(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]{0,31})?\s*:", text)
             or re.fullmatch(rf"if\s+{_NAME}\s*==\s*.+:", text)
             or text == "else:"
         ):
