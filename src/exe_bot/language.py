@@ -70,6 +70,8 @@ _DISCORD_ACTIONS = {
     "create_role": (1, 3), "delete_role": (1, 1),
     "create_category": (1, 2), "create_channel": (1, 3), "delete_channel": (1, 1),
     "slowmode": (1, 1), "clear": (1, 1),
+    "guilds_roles": (0, 0), "guilds_members": (0, 0),
+    "guilds_channels": (0, 0), "guilds_categories": (0, 0),
 }
 _ACTION_CALL = re.compile(r"^([a-z_]+)\((.*)\)$", re.IGNORECASE)
 _MAX_REPEAT = 10
@@ -349,6 +351,13 @@ def _parse_one(
                         chunks.append(str(variables[variable_name][index]))
                     except (ValueError, SyntaxError, KeyError, IndexError, TypeError) as exc:
                         raise ScriptError(f"Line {line_number}: invalid list/dictionary index in f-string") from exc
+                elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Call) and isinstance(value.value.func, ast.Name) and value.value.func.id in {"guilds_roles", "guilds_members", "guilds_channels", "guilds_categories"}:
+                    call = value.value
+                    if call.args or call.keywords:
+                        raise ScriptError(f"Line {line_number}: {call.func.id}() takes no arguments")
+                    result_name = f"__exe_result_{len(deferred_actions)}"
+                    deferred_actions.append(DiscordAction(call.func.id, (), result_name))
+                    chunks.append(f"__EXE_VAR_{result_name}__")
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Call) and isinstance(value.value.func, ast.Name) and value.value.func.id == "create_role":
                     call = value.value
                     if not 1 <= len(call.args) <= 3 or call.keywords:
