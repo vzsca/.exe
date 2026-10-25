@@ -206,3 +206,48 @@ def test_unknown_function_is_not_allowed():
 def test_discord_action_counts_towards_action_limit():
     with pytest.raises(ScriptError, match='limit of 1'):
         parse_script('clear(5)\nban("123456789012345678", "reason")', max_actions=1)
+
+
+
+def test_compact_repeat_supports_multiple_nested_actions():
+    program = parse_script(
+        'R(2, m("start")§create_role("Tester", "#5865F2", "view_channel, send_messages"))'
+    )
+    assert expand_actions(program) == [
+        SendMessage("start"),
+        DiscordAction("create_role", ("Tester", "#5865F2", "view_channel, send_messages")),
+        SendMessage("start"),
+        DiscordAction("create_role", ("Tester", "#5865F2", "view_channel, send_messages")),
+    ]
+
+
+def test_compact_condition_supports_multiple_nested_actions():
+    program = parse_script(
+        'v(mode, "safe")§I(mode, "safe", m("allowed")§create_category("Test"))'
+    )
+    assert expand_actions(program) == [
+        SendMessage("allowed"),
+        DiscordAction("create_category", ("Test",)),
+    ]
+
+
+def test_nested_separator_inside_quotes_is_preserved():
+    program = parse_script('R(2, m("left§right")§m("next"))')
+    assert expand_actions(program) == [
+        SendMessage("left§right"),
+        SendMessage("next"),
+        SendMessage("left§right"),
+        SendMessage("next"),
+    ]
+
+
+def test_nested_repeat_can_contain_multiple_actions():
+    program = parse_script('R(2, m("outer")§R(2, m("inner")))')
+    assert expand_actions(program) == [
+        SendMessage("outer"),
+        SendMessage("inner"),
+        SendMessage("inner"),
+        SendMessage("outer"),
+        SendMessage("inner"),
+        SendMessage("inner"),
+    ]
