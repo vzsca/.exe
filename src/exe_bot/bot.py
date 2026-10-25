@@ -346,7 +346,7 @@ def build_bot(settings: Settings) -> ExeBot:
                         if action.role_mentions:
                             if ctx.guild is None:
                                 raise ScriptError("Role mentions only work inside a server.")
-                            role_pattern = re.compile(r"@([A-Za-z0-9_-][A-Za-z0-9_ -]{0,99}?)(?=\\s|$|[,!.?:;])")
+                            role_pattern = re.compile(r"@([A-Za-z0-9_-][A-Za-z0-9_ -]{0,99}?)(?=\s|$|[,!.?:;])")
                             def replace_role(match: re.Match[str]) -> str:
                                 raw_role = match.group(1).strip()
                                 role = (ctx.guild.get_role(int(raw_role)) if raw_role.isdigit()
