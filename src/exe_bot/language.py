@@ -472,7 +472,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     if not statements:
         raise ScriptError("Script is empty")
 
-    variables: dict[str, str] = {}
+    variables: dict[str, object] = {}
     instructions: list[Instruction] = []
     for line_number, statement in statements:
         else_match = _ELSE_STANDARD.fullmatch(statement) or _ELSE_COMPACT.fullmatch(statement)
@@ -491,6 +491,8 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
             instructions.append(instruction)
             if isinstance(instruction, SetVariable):
                 variables[instruction.name] = instruction.value
+            elif isinstance(instruction, InputVariable):
+                variables[instruction.name] = "__EXE_PENDING_INPUT__"
 
     action_budget = sum(_count_actions(instruction) for instruction in instructions)
     if action_budget > max_actions:
