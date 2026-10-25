@@ -14,7 +14,7 @@ Implemented:
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
 - `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
-- `if greeting == "Hello": send("yes")` / compact `I(greeting, "Hello", m("yes"))` for equality conditions.
+- `if greeting == "Hello": send("yes")` with an optional following `else: send("no")` line; compact `I(greeting, "Hello", m("yes"))` supports conditions without an else branch.
 - Owner-ID and SQLite-backed whitelist access checks.
 - Owner-only whitelist management: `!exe admin add @user`, `!exe admin remove @user`, and `!exe admin list`.
 - SQLite tables for custom scripts, event handlers, and whitelist entries.
@@ -24,7 +24,7 @@ Implemented:
 - Script-generated messages cannot ping users or roles.
 - Automated parser and storage tests, plus a GitHub Actions test workflow.
 
-Still to build: alternate branches (`else`), richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
+Still to build: richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
 
 ## Syntax examples
 
@@ -35,7 +35,10 @@ let greeting = "Hello"
 send(greeting)
 repeat 3: send(greeting)
 if greeting == "Hello": send("Matched")
+else: send("Not matched")
 ```
+
+The `else` must be on the next line immediately after its `if`.
 
 Compact:
 
