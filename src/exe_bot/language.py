@@ -278,7 +278,7 @@ def _parse_one(
         role_mentions = raw_text.startswith('f"') or raw_text.startswith("f'")
         if role_mentions:
             try:
-                parsed = ast.parse(raw_text[1:], mode="eval").body
+                parsed = ast.parse(raw_text, mode="eval").body
             except SyntaxError as exc:
                 raise ScriptError(f"Line {line_number}: invalid f-string") from exc
             if not isinstance(parsed, ast.JoinedStr):
