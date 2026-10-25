@@ -128,3 +128,27 @@ def test_else_action_counts_towards_action_limit():
 def test_else_without_if_is_rejected():
     with pytest.raises(ScriptError, match="else must immediately follow"):
         parse_script('else: send("denied")')
+
+
+
+def test_compact_else_runs_when_condition_is_false():
+    program = parse_script(
+        'v(mode, "safe")\n'
+        'I(mode, "admin", m("allowed"))\n'
+        'E(m("denied"))'
+    )
+    assert expand_actions(program) == [SendMessage("denied")]
+
+
+def test_compact_else_is_skipped_when_condition_is_true():
+    program = parse_script(
+        'v(mode, "safe")\n'
+        'I(mode, "safe", m("allowed"))\n'
+        'E(m("denied"))'
+    )
+    assert expand_actions(program) == [SendMessage("allowed")]
+
+
+def test_compact_else_without_condition_is_rejected():
+    with pytest.raises(ScriptError, match="else must immediately follow"):
+        parse_script('E(m("denied"))')
