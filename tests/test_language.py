@@ -295,3 +295,23 @@ def test_unexpected_indentation_is_rejected():
 def test_empty_indented_block_is_rejected():
     with pytest.raises(ScriptError, match="block body cannot be empty"):
         parse_script('repeat 2:\nsend("not indented")')
+
+
+
+def test_send_f_string_supports_defined_variables_and_role_mentions():
+    program = parse_script('let greeting = "Salut"\nsend(f"{greeting} @Moderateurs")')
+    assert expand_actions(program) == [SendMessage("Salut @Moderateurs", None, True)]
+
+
+def test_send_can_target_a_channel_by_name_or_id():
+    assert parse_script('send("hello", "#general")') == [
+        SendMessage("hello", "#general", False)
+    ]
+    assert parse_script('send("hello", "123456789012345678")') == [
+        SendMessage("hello", "123456789012345678", False)
+    ]
+
+
+def test_f_string_does_not_allow_python_expressions():
+    with pytest.raises(ScriptError, match="only support text and defined variables"):
+        parse_script('send(f"{1 + 1}")')
