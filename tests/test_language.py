@@ -331,3 +331,21 @@ def test_input_variable_is_parsed_and_kept_in_action_order():
 def test_input_requires_a_non_empty_question():
     with pytest.raises(ScriptError, match="input question cannot be empty"):
         parse_script('let answer = input("")\nsend("ok")')
+
+
+def test_list_and_dictionary_values_and_indexing():
+    program = parse_script('let users = ["Alice", "Bob"]\nlet config = {"prefix": "!exe", "mode": "safe"}\nsend(f"{users[0]} uses {config[\'prefix\']}")')
+    assert program[-1] == SendMessage("Alice uses !exe", None, True)
+
+
+def test_create_role_can_be_called_inside_f_string():
+    program = parse_script('send(f"Created {create_role(\'Testers\')}")')
+    assert program == [
+        DiscordAction("create_role", ("Testers",), "__exe_result_0"),
+        SendMessage("Created __EXE_VAR___exe_result_0__", None, True),
+    ]
+
+
+def test_list_and_dictionary_are_bounded():
+    with pytest.raises(ScriptError, match="limited to 100"):
+        parse_script('let users = ' + repr(list(range(101))) + '\nsend("ok")')
