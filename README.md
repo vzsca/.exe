@@ -18,10 +18,12 @@ Implemented:
 - Owner-only whitelist management: `!exe admin add @user`, `!exe admin remove @user`, and `!exe admin list`.
 - SQLite tables for custom scripts, event handlers, and whitelist entries.
 - Limits on script size, action count, message size, repeat count/depth, and execution time.
+- Save, list, run, and delete your own named scripts directly in Discord.
+- Saved scripts are syntax-validated before storage and run through the same bounded engine as direct scripts.
 - Script-generated messages cannot ping users or roles.
 - Automated parser and storage tests, plus a GitHub Actions test workflow.
 
-Still to build: conditionals, richer values and expressions, Discord administration actions, commands for saving/running user scripts and event handlers, hot-loading stored scripts, and `sudo` verification.
+Still to build: conditionals, richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
 
 ## Syntax examples
 
@@ -69,11 +71,19 @@ The SQLite file is created automatically at `DATABASE_PATH` (default: `data/exe.
 
 Run tests with `python -m pip install -r requirements-dev.txt`, then `python -m pytest`.
 
-## Planned command concepts
+## Discord commands
 
-- `!exe <script>` — run a script.
-- `!exe admin add @user` — owner-only whitelist management.
-- `sudo` — additional confirmation for sensitive owner actions.
+Only the configured owner and whitelisted users can use script commands. Each user can manage only their own saved scripts.
+
+- `!exe <script>` — run a script immediately.
+- `!exe save <name> :: <script>` — validate and save a script (does not run it).
+- `!exe run <name>` — run one of your saved scripts.
+- `!exe list` — list your saved script names.
+- `!exe delete <name>` — delete one of your saved scripts.
+- `!help_exe` — show command and syntax help.
+- `!exe admin add @user`, `!exe admin remove @user`, `!exe admin list` — owner-only whitelist management.
+
+Example: `!exe save hello :: let greeting = "Hello"; send(greeting)`, then `!exe run hello`.
 
 Command names and syntax are provisional until the language specification is settled.
 
