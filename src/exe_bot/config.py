@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 class Settings:
     token: str
     owner_id: int
-    script_timeout_seconds: float = 5.0
+    script_timeout_seconds: float = 15.0
     max_script_actions: int = 20
     database_path: str = "data/exe.sqlite3"
 
@@ -57,7 +57,7 @@ def load_settings() -> Settings:
     return Settings(
         token=token,
         owner_id=owner_id,
-        script_timeout_seconds=_positive_float("SCRIPT_TIMEOUT_SECONDS", 5.0),
+        script_timeout_seconds=_positive_float("SCRIPT_TIMEOUT_SECONDS", 15.0),
         max_script_actions=_positive_int("MAX_SCRIPT_ACTIONS", 20),
         database_path=database_path,
     )
