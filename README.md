@@ -39,7 +39,21 @@ if greeting == "Hello": send("Matched")
 else: send("Not matched")
 ```
 
-The `else` must be on the next line immediately after its `if`.
+The `else` must be on the next line immediately after its `if`. Standard `repeat`, `if`, and `else` blocks also support indentation and multiple instructions:
+
+```text
+let mode = "safe"
+repeat 2:
+    send("Starting")
+    send("Still running")
+if mode == "admin":
+    send("Admin mode")
+    send("Second admin message")
+else:
+    send("Safe mode")
+```
+
+Nested blocks are supported, and indentation must be consistent. Blocks cannot be empty.
 
 Compact:
 
