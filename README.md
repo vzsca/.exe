@@ -65,10 +65,14 @@ create_role("Helpers")
 create_role("Moderators", "#5865F2", "view_channel, send_messages, manage_messages, kick_members")
 delete_role("123456789012345678")
 create_channel("welcome")
+create_channel("staff", "Staff")
+create_channel("private", "Staff", "@everyone:view_channel=deny, Moderators:view_channel=allow, Moderators:send_messages=allow")
 delete_channel("123456789012345678")
 slowmode(5)
 clear(25)
 ```
+
+For `create_channel`, the channel name is required. The optional second argument is an existing category name or ID. The optional third argument defines permission overwrites as comma-separated `target:permission=allow|deny` entries. Use `@everyone` or an existing role name/ID as the target, and supported channel permissions such as `view_channel`, `send_messages`, `read_message_history`, `manage_messages`, `connect`, or `speak`. Example: `create_channel("private", "Staff", "@everyone:view_channel=deny, Moderators:view_channel=allow")`. If a category is provided without custom overwrites, the new channel inherits that category's permissions.
 
 For `create_role`, the name is required; color and permissions are optional. Use a six-digit hex color (for example `"#5865F2"`) and a comma-separated permission string (for example `"view_channel, send_messages, manage_messages"`). Supported permissions are `view_channel`, `send_messages`, `read_message_history`, `embed_links`, `attach_files`, `add_reactions`, `use_external_emojis`, `connect`, `speak`, `stream`, `use_voice_activation`, `manage_messages`, `manage_nicknames`, `kick_members`, `ban_members`, `moderate_members`, and `view_audit_log`. High-risk permissions, including `administrator`, are intentionally not supported.
 
