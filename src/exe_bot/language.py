@@ -16,7 +16,7 @@ class ScriptError(ValueError):
 @dataclass(frozen=True, slots=True)
 class SetVariable:
     name: str
-    value: str
+    value: object
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,7 +217,7 @@ def _split_arguments(source: str) -> list[str]:
     return parts
 
 
-def _parse_discord_action(statement: str, line_number: int, variables: dict[str, str]) -> DiscordAction | None:
+def _parse_discord_action(statement: str, line_number: int, variables: dict[str, object]) -> DiscordAction | None:
     match = _ACTION_CALL.fullmatch(statement)
     if not match:
         return None
@@ -393,9 +393,12 @@ def _parse_one(
 
 def _block_to_compact(header: str, children: list[str], line_no: int) -> str:
     body = "§".join(children)
-    repeat_match = re.fullmatch(r"repeat\s+(\d+)", header)
+    repeat_match = re.fullmatch(r"repeat\s+(\d+)(?:\s+as\s+([A-Za-z_][A-Za-z0-9_]{0,31}))?", header)
     if repeat_match:
-        return "R(" + repeat_match.group(1) + ", " + body + ")"
+        count, loop_name = repeat_match.groups()
+        if loop_name:
+            return f"repeat {count} as {loop_name}: " + body
+        return "R(" + count + ", " + body + ")"
     if_match = re.fullmatch(rf"if\s+({_NAME})\s*==\s*(.+)", header)
     if if_match:
         return "I(" + if_match.group(1) + ", " + if_match.group(2) + ", " + body + ")"
@@ -426,7 +429,7 @@ def _normalize_indented_blocks(source: str) -> str:
             if indent < parent_indent:
                 break
             is_block = text.endswith(":") and (
-                re.fullmatch(r"repeat\s+\d+\s*:", text)
+                re.fullmatch(r"repeat\s+\d+(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]{0,31})?\s*:", text)
                 or re.fullmatch(rf"if\s+{_NAME}\s*==\s*.+:", text)
                 or text == "else:"
             )
