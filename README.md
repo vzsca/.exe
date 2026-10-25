@@ -49,9 +49,11 @@ m(greeting)
 R(3, m(greeting))
 I(greeting, "Hello", m("Matched"))
 E(m("Not matched"))
+
+Compact one-liner: `v(greeting, "Hello")§m(greeting)§R(3, m(greeting))`
 ```
 
-For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons can also separate instructions on a single line.
+For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons or `§` can also separate instructions on a single line; `§` is the compact syntax separator and behaves like a newline outside quoted text.
 
 ### Discord action examples
 
