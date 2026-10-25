@@ -352,6 +352,19 @@ def test_list_and_dictionary_are_bounded():
 
 
 
+def test_guild_inventory_functions_are_allowed_only_as_no_arg_fstring_calls():
+    program = parse_script(
+        'send(f"Roles: {guilds_roles()}")\\n'
+        'send(f"Members: {guilds_members()}")\\n'
+        'send(f"Channels: {guilds_channels()}")\\n'
+        'send(f"Categories: {guilds_categories()}")'
+    )
+    assert len(program) == 4
+    assert all(isinstance(item, DiscordAction) or isinstance(item, SendMessage) for item in program)
+    with pytest.raises(ScriptError, match="takes no arguments"):
+        parse_script('send(f"{guilds_roles(1)}")')
+
+
 def test_indented_counted_loop_supports_counter_interpolation():
     program = parse_script(
         'repeat 3 as i:\n'
