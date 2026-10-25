@@ -162,6 +162,8 @@ def test_compact_else_without_condition_is_rejected():
     ('timeout("123456789012345678", 10)', DiscordAction('timeout', ('123456789012345678', 10))),
     ('untimeout("123456789012345678")', DiscordAction('untimeout', ('123456789012345678',))),
     ('create_role("Helpers")', DiscordAction('create_role', ('Helpers',))),
+    ('create_role("Helpers", "#5865F2")', DiscordAction('create_role', ('Helpers', '#5865F2'))),
+    ('create_role("Helpers", "#5865F2", "view_channel, send_messages")', DiscordAction('create_role', ('Helpers', '#5865F2', 'view_channel, send_messages'))),
     ('delete_role("123456789012345678")', DiscordAction('delete_role', ('123456789012345678',))),
     ('create_channel("general")', DiscordAction('create_channel', ('general',))),
     ('delete_channel("123456789012345678")', DiscordAction('delete_channel', ('123456789012345678',))),
