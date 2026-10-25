@@ -338,27 +338,20 @@ def _normalize_indented_blocks(source: str) -> str:
 
     if not parsed_lines:
         return source
-    # Even without child lines, recognize block headers so empty blocks get a clear error.
+    # If there are no indented lines, still reject a block header whose next
+    # instruction is at the same indentation level.
     if not any(indent > parsed_lines[0][0] for indent, _, _ in parsed_lines):
-        if any(
-            text.endswith(":") and (
-                re.fullmatch(r"repeat\\s+\\d+\\s*:", text)
-                or re.fullmatch(rf"if\\s+{_NAME}\\s*==\\s*.+:", text)
+        for position, (indent, text, line_no) in enumerate(parsed_lines):
+            is_block = text.endswith(":") and (
+                re.fullmatch(r"repeat\s+\d+\s*:", text)
+                or re.fullmatch(rf"if\s+{_NAME}\s*==\s*.+:", text)
                 or text == "else:"
             )
-            for _, text, _ in parsed_lines
-        ):
-            header_index = next(
-                i for i, (_, text, _) in enumerate(parsed_lines)
-                if text.endswith(":") and (
-                    re.fullmatch(r"repeat\\s+\\d+\\s*:", text)
-                    or re.fullmatch(rf"if\\s+{_NAME}\\s*==\\s*.+:", text)
-                    or text == "else:"
-                )
-            )
-            _, header_text, header_line = parsed_lines[header_index]
-            if header_index + 1 >= len(parsed_lines) or parsed_lines[header_index + 1][0] <= parsed_lines[header_index][0]:
-                raise ScriptError(f"Line {header_line}: block body cannot be empty")
+            if is_block and (
+                position + 1 >= len(parsed_lines)
+                or parsed_lines[position + 1][0] <= indent
+            ):
+                raise ScriptError(f"Line {line_no}: block body cannot be empty")
         return source
     # At top level, the first line may have no indentation; all top-level lines
     # must share that indentation to avoid silently accepting malformed blocks.
