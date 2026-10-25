@@ -252,7 +252,7 @@ def _parse_discord_action(statement: str, line_number: int, variables: dict[str,
 def _parse_one(
     statement: str,
     line_number: int,
-    variables: dict[str, str],
+    variables: dict[str, object],
     depth: int,
 ) -> list[Instruction]:
     if depth > _MAX_DEPTH:
