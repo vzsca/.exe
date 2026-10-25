@@ -36,6 +36,7 @@ class SendMessage:
 class DiscordAction:
     name: str
     arguments: tuple[str | int, ...]
+    result_variable: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,8 +76,19 @@ _MAX_REPEAT = 10
 _MAX_DEPTH = 4
 
 
-def _parse_value(source: str, line_number: int, variables: dict[str, str]) -> str:
+def _parse_value(source: str, line_number: int, variables: dict[str, object]) -> object:
     source = source.strip()
+    indexed = re.fullmatch(rf"({_NAME})\[(.+)\]", source)
+    if indexed:
+        name, raw_index = indexed.groups()
+        if name not in variables:
+            raise ScriptError(f"Line {line_number}: unknown variable '{name}'")
+        try:
+            index = ast.literal_eval(raw_index)
+            value = variables[name][index]  # type: ignore[index]
+        except (ValueError, SyntaxError, KeyError, IndexError, TypeError) as exc:
+            raise ScriptError(f"Line {line_number}: invalid list/dictionary index") from exc
+        return value
     if re.fullmatch(_NAME, source):
         if source not in variables:
             raise ScriptError(f"Line {line_number}: unknown variable '{source}'")
@@ -84,12 +96,12 @@ def _parse_value(source: str, line_number: int, variables: dict[str, str]) -> st
     try:
         value = ast.literal_eval(source)
     except (ValueError, SyntaxError) as exc:
-        raise ScriptError(
-            f"Line {line_number}: expected quoted text or a defined variable"
-        ) from exc
-    if not isinstance(value, str):
-        raise ScriptError(f"Line {line_number}: values must be text strings")
-    if len(value) > 1800:
+        raise ScriptError(f"Line {line_number}: expected a string, number, list, dictionary, or defined variable") from exc
+    if not isinstance(value, (str, int, float, bool, list, dict, tuple)) and value is not None:
+        raise ScriptError(f"Line {line_number}: unsupported value type")
+    if isinstance(value, (list, tuple, dict)) and len(value) > 100:
+        raise ScriptError(f"Line {line_number}: collections are limited to 100 items")
+    if isinstance(value, str) and len(value) > 1800:
         raise ScriptError(f"Line {line_number}: text is too long (maximum 1800 characters)")
     return value
 
@@ -158,7 +170,7 @@ def _split_statements(source: str) -> list[tuple[int, str]]:
 def _parse_body(
     source: str,
     line_number: int,
-    variables: dict[str, str],
+    variables: dict[str, object],
     depth: int,
 ) -> list[Instruction]:
     """Parse multiple nested instructions while sharing the current variables."""
@@ -290,6 +302,7 @@ def _parse_one(
             raise ScriptError(f"Line {line_number}: send expects message text and an optional channel")
         raw_text = parts[0].strip()
         role_mentions = raw_text.startswith('f"') or raw_text.startswith("f'")
+        deferred_actions: list[DiscordAction] = []
         if role_mentions:
             try:
                 parsed = ast.parse(raw_text, mode="eval").body
@@ -304,9 +317,31 @@ def _parse_one(
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name):
                     if value.value.id not in variables:
                         raise ScriptError(f"Line {line_number}: unknown variable '{value.value.id}' in f-string")
-                    chunks.append(f"__EXE_VAR_{value.value.id}__" if variables[value.value.id] == "__EXE_PENDING_INPUT__" else variables[value.value.id])
+                    current = variables[value.value.id]
+                    chunks.append(f"__EXE_VAR_{value.value.id}__" if current == "__EXE_PENDING_INPUT__" else str(current))
+                elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Subscript) and isinstance(value.value.value, ast.Name):
+                    variable_name = value.value.value.id
+                    if variable_name not in variables:
+                        raise ScriptError(f"Line {line_number}: unknown variable '{variable_name}' in f-string")
+                    try:
+                        index = ast.literal_eval(value.value.slice)
+                        chunks.append(str(variables[variable_name][index]))
+                    except (ValueError, SyntaxError, KeyError, IndexError, TypeError) as exc:
+                        raise ScriptError(f"Line {line_number}: invalid list/dictionary index in f-string") from exc
+                elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Call) and isinstance(value.value.func, ast.Name) and value.value.func.id == "create_role":
+                    call = value.value
+                    if not 1 <= len(call.args) <= 3 or call.keywords:
+                        raise ScriptError(f"Line {line_number}: create_role in f-strings expects 1 to 3 simple arguments")
+                    args = []
+                    for arg in call.args:
+                        if not isinstance(arg, ast.Constant) or not isinstance(arg.value, (str, int)) or isinstance(arg.value, bool):
+                            raise ScriptError(f"Line {line_number}: create_role arguments in f-strings must be quoted text or integers")
+                        args.append(arg.value)
+                    result_name = f"__exe_result_{len(deferred_actions)}"
+                    deferred_actions.append(DiscordAction("create_role", tuple(args), result_name))
+                    chunks.append(f"__EXE_VAR_{result_name}__")
                 else:
-                    raise ScriptError(f"Line {line_number}: f-strings only support text and defined variables")
+                    raise ScriptError(f"Line {line_number}: f-strings support text, variables, list/dictionary indexing, and create_role(...)")
             text_value = "".join(chunks)
             if len(text_value) > 1800:
                 raise ScriptError(f"Line {line_number}: text is too long (maximum 1800 characters)")
@@ -317,7 +352,7 @@ def _parse_one(
             channel = str(_parse_value(parts[1], line_number, variables)).strip()
             if not channel:
                 raise ScriptError(f"Line {line_number}: target channel cannot be empty")
-        return [SendMessage(text_value, channel, role_mentions)]
+        return [*deferred_actions, SendMessage(text_value, channel, role_mentions)]
 
     raise ScriptError(
         f"Line {line_number}: unknown instruction. Try let name = \"text\", "
