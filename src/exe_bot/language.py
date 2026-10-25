@@ -48,6 +48,7 @@ _REPEAT_COMPACT = re.compile(r"^R\(\s*(\d+)\s*,\s*(.+)\s*\)$")
 _IF_STANDARD = re.compile(rf"^if\s+({_NAME})\s*==\s*(.+?)\s*:\s*(.+)$")
 _IF_COMPACT = re.compile(rf"^I\(\s*({_NAME})\s*,\s*(.+?)\s*,\s*(.+)\s*\)$")
 _ELSE_STANDARD = re.compile(r"^else\s*:\s*(.+)$")
+_ELSE_COMPACT = re.compile(r"^E\(\s*(.+)\s*\)$")
 _MAX_REPEAT = 10
 _MAX_DEPTH = 4
 
@@ -148,7 +149,7 @@ def _parse_one(
     raise ScriptError(
         f"Line {line_number}: unknown instruction. Try let name = \"text\", "
         "send(\"text\"), if name == \"text\": send(\"yes\"), repeat 3: send(\"text\"), "
-        "or compact v(...), m(...), I(...), R(...)."
+        "or compact v(...), m(...), I(...), E(...), R(...)."
     )
 
 
@@ -164,7 +165,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     variables: dict[str, str] = {}
     instructions: list[Instruction] = []
     for line_number, statement in statements:
-        else_match = _ELSE_STANDARD.fullmatch(statement)
+        else_match = _ELSE_STANDARD.fullmatch(statement) or _ELSE_COMPACT.fullmatch(statement)
         if else_match:
             if not instructions or not isinstance(instructions[-1], IfEquals):
                 raise ScriptError(f"Line {line_number}: else must immediately follow an if condition")
