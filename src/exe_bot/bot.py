@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 from .config import Settings
-from .language import DiscordAction, ScriptError, SendMessage, expand_actions, parse_script
+from .language import DiscordAction, InputVariable, ScriptError, SendMessage, expand_actions, parse_script
 from .permissions import is_owner, may_run_scripts
 from .storage import Database, StorageError
 
@@ -320,18 +320,30 @@ def build_bot(settings: Settings) -> ExeBot:
             return False
 
         current_action = {"index": 0, "name": "not started"}
+        runtime_variables: dict[str, str] = {}
         log.info(".exe script parsed: %d actions (channel=%s actor=%s timeout=%ss)",
                  len(actions), ctx.channel.id, ctx.author.id, settings.script_timeout_seconds)
 
         async def execute_actions() -> None:
             for index, action in enumerate(actions, start=1):
-                action_name = "send" if isinstance(action, SendMessage) else action.name
+                action_name = "input" if isinstance(action, InputVariable) else ("send" if isinstance(action, SendMessage) else action.name)
                 current_action.update(index=index, name=action_name)
                 started = time.monotonic()
                 log.info(".exe action %d/%d starting: %s (channel=%s actor=%s)",
                          index, len(actions), action_name, ctx.channel.id, ctx.author.id)
                 try:
-                    if isinstance(action, SendMessage):
+                    if isinstance(action, InputVariable):
+                        await ctx.channel.send(action.question)
+                        def check(message: discord.Message) -> bool:
+                            return message.author.id == ctx.author.id and message.channel.id == ctx.channel.id and not message.author.bot
+                        try:
+                            answer = await bot.wait_for("message", check=check, timeout=settings.script_timeout_seconds)
+                        except asyncio.TimeoutError as exc:
+                            raise ScriptError(f"Input '{action.name}' timed out while waiting for your reply.") from exc
+                        if len(answer.content) > 1800:
+                            raise ScriptError("Input response is too long (maximum 1800 characters).")
+                        runtime_variables[action.name] = answer.content
+                    elif isinstance(action, SendMessage):
                         target = ctx.channel
                         if action.channel is not None:
                             if ctx.guild is None:
@@ -342,6 +354,8 @@ def build_bot(settings: Settings) -> ExeBot:
                             if not isinstance(target, discord.TextChannel):
                                 raise ScriptError("Could not find the target text channel by ID or exact name.")
                         content = action.text
+                        for variable_name, variable_value in runtime_variables.items():
+                            content = content.replace(f"__EXE_VAR_{variable_name}__", variable_value)
                         allowed_roles = []
                         if action.role_mentions:
                             if ctx.guild is None:
