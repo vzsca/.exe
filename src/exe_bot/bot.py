@@ -28,7 +28,8 @@ HELP_TEXT = (
     'Compact condition: I(greeting, "Hello", m("yes")); compact else on next line: E(m("no"))\n'
     'Repeat: repeat 3: send(greeting) or repeat 3 as i: send(f"{i}") or R(3, m(greeting))\n'
     'Server actions: ban(id, "reason"), unban(id), kick(id, "reason"), timeout(id, minutes), untimeout(id)\n'
-    'Roles: create_role("name"), give_role(member_id, role_id_or_exact_name), remove_role(member_id, role_id_or_exact_name), delete_role(id_or_exact_name)\n'\n    'Channels: create_channel("name"), delete_channel(id_or_exact_name)\n'
+    'Roles: create_role("name"), give_role(user_id_or_mention, role_id_name_or_mention), remove_role(user_id_or_mention, role_id_name_or_mention), delete_role(id_or_exact_name)\n'
+    'Channels: create_channel("name"), delete_channel(id_or_exact_name)\n'
     'Read-only lists: send(f"{guilds_roles()}"), send(f"{guilds_members()}"), send(f"{guilds_channels()}"), send(f"{guilds_categories()}")\n'
     'Member list requires Server Members Intent; output is capped at 100 members.\n'
     'Moderation: slowmode(seconds), clear(count); requires matching Discord permissions and bot role access.\n'
@@ -128,7 +129,9 @@ def build_bot(settings: Settings) -> ExeBot:
         if name in {"give_role", "remove_role"}:
             member_id = target_id(args[0])
             raw_role = str(args[1]).strip()
-            role = guild.get_role(int(raw_role)) if raw_role.isdigit() else discord.utils.get(guild.roles, name=raw_role)
+            role_mention = re.fullmatch(r"<@&(\d+)>", raw_role)
+            role_id = role_mention.group(1) if role_mention else raw_role
+            role = guild.get_role(int(role_id)) if role_id.isdigit() else discord.utils.get(guild.roles, name=raw_role)
             if role is None:
                 raise ScriptError("Could not find that role by ID or exact name.")
             try:
