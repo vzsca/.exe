@@ -73,6 +73,7 @@ def build_bot(settings: Settings) -> ExeBot:
             raise ScriptError("Discord administration functions only work inside a server.")
         guild = ctx.guild
         actor = ctx.author
+        name, args = action.name, action.arguments
         if name in {"guilds_roles", "guilds_members", "guilds_channels", "guilds_categories"}:
             if name == "guilds_roles":
                 entries = [f"{role.name} (ID: {role.id})" for role in sorted(guild.roles, key=lambda item: item.position, reverse=True)]
@@ -98,11 +99,11 @@ def build_bot(settings: Settings) -> ExeBot:
         if bot_member is None:
             raise ScriptError("Could not verify the bot's server permissions.")
 
-        name, args = action.name, action.arguments
         permission_by_action = {
             "ban": "ban_members", "unban": "ban_members",
             "kick": "kick_members", "timeout": "moderate_members",
-            "untimeout": "moderate_members", "create_role": "manage_roles",
+            "untimeout": "moderate_members", "give_role": "manage_roles",
+            "remove_role": "manage_roles", "create_role": "manage_roles",
             "delete_role": "manage_roles", "create_category": "manage_channels", "create_channel": "manage_channels",
             "delete_channel": "manage_channels", "slowmode": "manage_channels",
             "clear": "manage_messages",
@@ -124,6 +125,29 @@ def build_bot(settings: Settings) -> ExeBot:
             return int(match.group(1) or match.group(2))
 
         reason = str(args[1]) if len(args) > 1 else f".exe script by {actor} ({actor.id})"
+        if name in {"give_role", "remove_role"}:
+            member_id = target_id(args[0])
+            raw_role = str(args[1]).strip()
+            role = guild.get_role(int(raw_role)) if raw_role.isdigit() else discord.utils.get(guild.roles, name=raw_role)
+            if role is None:
+                raise ScriptError("Could not find that role by ID or exact name.")
+            try:
+                member = guild.get_member(member_id) or await guild.fetch_member(member_id)
+            except discord.NotFound as exc:
+                raise ScriptError("That member is not currently in this server.") from exc
+            except discord.Forbidden as exc:
+                raise ScriptError("Could not look up that member; check the bot's server access.") from exc
+            if role.is_default():
+                raise ScriptError("The @everyone role cannot be assigned or removed this way.")
+            if role >= bot_member.top_role:
+                raise ScriptError("The bot's highest role must be above the target role.")
+            if guild.owner_id != actor.id and role >= actor.top_role:
+                raise ScriptError("Your highest role must be above the target role.")
+            if name == "give_role":
+                await member.add_roles(role, reason=f".exe by {actor.id}")
+            else:
+                await member.remove_roles(role, reason=f".exe by {actor.id}")
+            return
         if name in {"ban", "unban", "kick", "timeout", "untimeout"}:
             user_id = target_id(args[0])
             member = guild.get_member(user_id)
