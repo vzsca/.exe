@@ -15,6 +15,25 @@ from .permissions import is_owner, may_run_scripts
 from .storage import Database, StorageError
 
 log = logging.getLogger(__name__)
+
+HELP_TEXT = (
+    'Run: !exe send("Hello")\n'
+    'Show help: !exe send(f"help") or !help_exe\n'
+    'Create and save: !exe create greeting :: send("Hello")\n'
+    'List scripts: !exe list\n'
+    'Run / delete saved: !exe run greeting / !exe delete greeting\n'
+    'Standard: let greeting = "Hello"; send(greeting)\n'
+    'Compact: v(greeting, "Hello"); m(greeting)\n'
+    'Condition: if greeting == "Hello": send("yes"); optional next line: else: send("no")\n'
+    'Compact condition: I(greeting, "Hello", m("yes")); compact else on next line: E(m("no"))\n'
+    'Repeat: repeat 3: send(greeting) or repeat 3 as i: send(f"{i}") or R(3, m(greeting))\n'
+    'Server actions: ban(id, "reason"), unban(id), kick(id, "reason"), timeout(id, minutes), untimeout(id)\n'
+    'Roles/channels: create_role("name"), delete_role(id_or_exact_name), create_channel("name"), delete_channel(id_or_exact_name)\n'
+    'Read-only lists: send(f"{guilds_roles()}"), send(f"{guilds_members()}"), send(f"{guilds_channels()}"), send(f"{guilds_categories()}")\n'
+    'Member list requires Server Members Intent; output is capped at 100 members.\n'
+    'Moderation: slowmode(seconds), clear(count); requires matching Discord permissions and bot role access.\n'
+    'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.'
+)
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
 _CREATE_RE = re.compile(r"^create\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s*::\s*(.+)$", re.IGNORECASE | re.DOTALL)
 _NAME_COMMAND_RE = re.compile(r"^(run|delete)\s+([A-Za-z][A-Za-z0-9_-]{0,31})$", re.IGNORECASE)
@@ -379,6 +398,9 @@ def build_bot(settings: Settings) -> ExeBot:
                         content = action.text
                         for variable_name, variable_value in runtime_variables.items():
                             content = content.replace(f"__EXE_VAR_{variable_name}__", variable_value)
+                        if content.strip().lower() == "help":
+                            await target.send(HELP_TEXT, allowed_mentions=discord.AllowedMentions.none())
+                            continue
                         allowed_roles = []
                         if action.role_mentions:
                             if ctx.guild is None:
@@ -587,24 +609,7 @@ def build_bot(settings: Settings) -> ExeBot:
 
     @bot.command(name="help_exe")
     async def help_exe(ctx: commands.Context) -> None:
-        await ctx.reply(
-            'Run: !exe send("Hello")\n'
-            'Create and save: !exe create greeting :: send("Hello")\n'
-            'List scripts: !exe list\n'
-            'Run / delete saved: !exe run greeting / !exe delete greeting\n'
-            'Standard: let greeting = "Hello"; send(greeting)\n'
-            'Compact: v(greeting, "Hello"); m(greeting)\n'
-            'Condition: if greeting == "Hello": send("yes"); optional next line: else: send("no")\n'
-            'Compact condition: I(greeting, "Hello", m("yes")); compact else on next line: E(m("no"))\n'
-            'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
-            'Server actions: ban(id, "reason"), unban(id), kick(id, "reason"), timeout(id, minutes), untimeout(id)\n'
-            'Roles/channels: create_role("name"), delete_role(id_or_exact_name), create_channel("name"), delete_channel(id_or_exact_name)\n'
-            'Read-only lists: send(f"{guilds_roles()}"), guilds_members(), guilds_channels(), guilds_categories()\n'
-            'Member list requires Server Members Intent; output is capped at 100 members.\n'
-            'Moderation: slowmode(seconds), clear(count); requires matching Discord permissions and bot role access.\n'
-            'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.',
-            mention_author=False,
-        )
+        await ctx.reply(HELP_TEXT, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
 
     return bot
 
