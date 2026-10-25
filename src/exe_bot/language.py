@@ -30,7 +30,13 @@ class Repeat:
     body: tuple["Instruction", ...]
 
 
-Instruction = SetVariable | SendMessage | Repeat
+@dataclass(frozen=True, slots=True)
+class IfEquals:
+    matched: bool
+    body: tuple["Instruction", ...]
+
+
+Instruction = SetVariable | SendMessage | Repeat | IfEquals
 _NAME = r"[A-Za-z_][A-Za-z0-9_]{0,31}"
 _SET_STANDARD = re.compile(rf"^let\s+({_NAME})\s*=\s*(.+)$")
 _SET_COMPACT = re.compile(rf"^v\(\s*({_NAME})\s*,\s*(.+)\s*\)$")
@@ -38,6 +44,8 @@ _SEND_STANDARD = re.compile(r"^send\((.*)\)$")
 _SEND_COMPACT = re.compile(r"^m\((.*)\)$")
 _REPEAT_STANDARD = re.compile(r"^repeat\s+(\d+)\s*:\s*(.+)$")
 _REPEAT_COMPACT = re.compile(r"^R\(\s*(\d+)\s*,\s*(.+)\s*\)$")
+_IF_STANDARD = re.compile(rf"^if\s+({_NAME})\s*==\s*(.+?)\s*:\s*(.+)$")
+_IF_COMPACT = re.compile(rf"^I\(\s*({_NAME})\s*,\s*(.+?)\s*,\s*(.+)\s*\)$")
 _MAX_REPEAT = 10
 _MAX_DEPTH = 4
 
@@ -109,6 +117,17 @@ def _parse_one(
         name, raw_value = match.groups()
         return [SetVariable(name, _parse_value(raw_value, line_number, variables))]
 
+    match = _IF_STANDARD.fullmatch(statement) or _IF_COMPACT.fullmatch(statement)
+    if match:
+        variable_name, raw_expected, body_source = match.groups()
+        if variable_name not in variables:
+            raise ScriptError(f"Line {line_number}: unknown variable '{variable_name}'")
+        expected = _parse_value(raw_expected, line_number, variables)
+        body = _parse_one(body_source.strip(), line_number, variables, depth + 1)
+        if not body:
+            raise ScriptError(f"Line {line_number}: if body cannot be empty")
+        return [IfEquals(variables[variable_name] == expected, tuple(body))]
+
     match = _REPEAT_STANDARD.fullmatch(statement) or _REPEAT_COMPACT.fullmatch(statement)
     if match:
         raw_count, body_source = match.groups()
@@ -126,7 +145,8 @@ def _parse_one(
 
     raise ScriptError(
         f"Line {line_number}: unknown instruction. Try let name = \"text\", "
-        "send(\"text\"), repeat 3: send(\"text\"), or compact v(...), m(...), R(...)."
+        "send(\"text\"), if name == \"text\": send(\"yes\"), repeat 3: send(\"text\"), "
+        "or compact v(...), m(...), I(...), R(...)."
     )
 
 
@@ -164,6 +184,10 @@ def _count_actions(instruction: Instruction) -> int:
         return 1
     if isinstance(instruction, SetVariable):
         return 0
+    if isinstance(instruction, IfEquals):
+        # Count the body even when the condition is false, so dead branches
+        # cannot be used to bypass the configured source action budget.
+        return sum(_count_actions(item) for item in instruction.body)
     return instruction.count * sum(_count_actions(item) for item in instruction.body)
 
 
@@ -178,7 +202,9 @@ def expand_actions(instructions: list[Instruction]) -> list[SendMessage]:
             elif isinstance(item, Repeat):
                 for _ in range(item.count):
                     expand(item.body)
-            # Variables are resolved by the parser before execution.
+            elif isinstance(item, IfEquals) and item.matched:
+                expand(item.body)
+            # Variables and conditions are resolved by the parser before execution.
 
     expand(instructions)
     return actions
