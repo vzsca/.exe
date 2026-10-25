@@ -67,3 +67,30 @@ def test_unknown_variable_is_reported():
 def test_repeat_expansion_respects_action_limit():
     with pytest.raises(ScriptError, match="limit of 4"):
         parse_script('repeat 3: send("x")\nsend("y")\nsend("z")', max_actions=4)
+
+
+
+def test_standard_equality_condition_runs_only_when_true():
+    program = parse_script('let mode = "safe"\nif mode == "safe": send("allowed")')
+    assert expand_actions(program) == [SendMessage("allowed")]
+
+
+def test_standard_equality_condition_skips_false_body():
+    program = parse_script('let mode = "safe"\nif mode == "danger": send("no")')
+    assert expand_actions(program) == []
+
+
+def test_compact_condition_matches_standard_semantics():
+    standard = parse_script('let mode = "safe"\nif mode == "safe": send("allowed")')
+    compact = parse_script('v(mode, "safe")\nI(mode, "safe", m("allowed"))')
+    assert expand_actions(standard) == expand_actions(compact)
+
+
+def test_condition_requires_defined_variable():
+    with pytest.raises(ScriptError, match="unknown variable"):
+        parse_script('if mode == "safe": send("no")')
+
+
+def test_condition_body_counts_towards_action_limit_even_when_false():
+    with pytest.raises(ScriptError, match="limit of 1"):
+        parse_script('let mode = "safe"\nif mode == "no": send("a")\nsend("b")', max_actions=1)
