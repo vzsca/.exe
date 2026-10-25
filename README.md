@@ -18,12 +18,11 @@ Implemented:
 - Owner-only whitelist management: `!exe admin add @user`, `!exe admin remove @user`, and `!exe admin list`.
 - SQLite tables for custom scripts, event handlers, and whitelist entries.
 - Limits on script size, action count, message size, repeat count/depth, and execution time.
-- Save, list, run, and delete your own named scripts directly in Discord.
-- Saved scripts are syntax-validated before storage and run through the same bounded engine as direct scripts.
+- Create and save named scripts directly in Discord after syntax validation.
 - Script-generated messages cannot ping users or roles.
 - Automated parser and storage tests, plus a GitHub Actions test workflow.
 
-Still to build: conditionals, richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
+Still to build: commands to list, run, and delete saved scripts; conditionals, richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
 
 ## Syntax examples
 
@@ -73,20 +72,17 @@ Run tests with `python -m pip install -r requirements-dev.txt`, then `python -m 
 
 ## Discord commands
 
-Only the configured owner and whitelisted users can use script commands. Each user can manage only their own saved scripts.
+Only the configured owner and whitelisted users can use script commands.
 
 - `!exe <script>` — run a script immediately.
-- `!exe save <name> :: <script>` — validate and save a script (does not run it).
-- `!exe run <name>` — run one of your saved scripts.
-- `!exe list` — list your saved script names.
-- `!exe delete <name>` — delete one of your saved scripts.
+- `!exe create <name> :: <script>` — validate and save a named script without running it.
 - `!help_exe` — show command and syntax help.
 - `!exe admin add @user`, `!exe admin remove @user`, `!exe admin list` — owner-only whitelist management.
 
-Example: `!exe save hello :: let greeting = "Hello"; send(greeting)`, then `!exe run hello`.
+Example: `!exe create hello :: let greeting = "Hello"; send(greeting)`.
 
-Command names and syntax are provisional until the language specification is settled.
-
+Saved-script listing, execution, and deletion are intentionally not implemented yet.
+ 
 ## Security note
 
 A one-time code sent through Discord DM adds a confirmation step, but it is not independent multi-factor authentication if the Discord account itself is compromised. Sensitive actions must still require strict owner checks and short-lived, single-use challenges.
