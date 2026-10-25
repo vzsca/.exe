@@ -280,7 +280,7 @@ def _parse_one(
             raise ScriptError(f"Line {line_number}: if body cannot be empty")
         return [IfEquals(variables[variable_name] == expected, tuple(body))]
 
-    loop_match = re.fullmatch(rf"repeat\\s+(\\d+)\\s+as\\s+({_NAME})\\s*:\\s*(.+)", statement)
+    loop_match = re.fullmatch(rf"repeat\s+(\d+)\s+as\s+({_NAME})\s*:\s*(.+)", statement)
     if loop_match:
         raw_count, loop_name, body_source = loop_match.groups()
         count = int(raw_count)
