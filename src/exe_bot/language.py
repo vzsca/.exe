@@ -356,6 +356,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     if len(source) > 8000:
         raise ScriptError("Script is too long (maximum 8000 characters)")
 
+    source = _normalize_indented_blocks(source)
     statements = _split_statements(source)
     if not statements:
         raise ScriptError("Script is empty")
