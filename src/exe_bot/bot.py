@@ -367,7 +367,7 @@ def build_bot(settings: Settings) -> ExeBot:
                             for role in sorted(ctx.guild.roles, key=lambda item: len(item.name), reverse=True):
                                 token = f"@{role.name}"
                                 # Match the whole role token, never a prefix such as @Mod in @Moderator.
-                                pattern = re.compile(r"(?<![\\w@])" + re.escape(token) + r"(?!\\w)")
+                                pattern = re.compile(r"(?<![\w@])" + re.escape(token) + r"(?!\w)")
                                 if pattern.search(content):
                                     content = pattern.sub(lambda _: role.mention, content)
                                     if role not in allowed_roles:
