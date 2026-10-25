@@ -278,6 +278,19 @@ def _parse_one(
     )
 
 
+def _block_to_compact(header: str, children: list[str], line_no: int) -> str:
+    body = "§".join(children)
+    repeat_match = re.fullmatch(r"repeat\s+(\d+)", header)
+    if repeat_match:
+        return "R(" + repeat_match.group(1) + ", " + body + ")"
+    if_match = re.fullmatch(rf"if\s+({_NAME})\s*==\s*(.+)", header)
+    if if_match:
+        return "I(" + if_match.group(1) + ", " + if_match.group(2) + ", " + body + ")"
+    if header == "else":
+        return "E(" + body + ")"
+    raise ScriptError(f"Line {line_no}: unsupported indented block")
+
+
 def _normalize_indented_blocks(source: str) -> str:
     """Convert indentation-based repeat/if/else blocks to the existing safe inline grammar."""
     lines = source.expandtabs(4).splitlines()
@@ -311,7 +324,7 @@ def _normalize_indented_blocks(source: str) -> str:
                 children, next_index = parse_level(index + 1, indent)
                 if not children:
                     raise ScriptError(f"Line {line_no}: block body cannot be empty")
-                result.append(text[:-1].rstrip() + ": " + "§".join(children))
+                result.append(_block_to_compact(text[:-1].rstrip(), children, line_no))
                 index = next_index
             else:
                 if indent > parent_indent and result and parsed_lines[index - 1][0] < indent:
@@ -324,6 +337,8 @@ def _normalize_indented_blocks(source: str) -> str:
         return result, index
 
     if not parsed_lines:
+        return source
+    if not any(indent > parsed_lines[0][0] for indent, _, _ in parsed_lines):
         return source
     # At top level, the first line may have no indentation; all top-level lines
     # must share that indentation to avoid silently accepting malformed blocks.
@@ -344,7 +359,7 @@ def _normalize_indented_blocks(source: str) -> str:
             children, index = parse_level(index + 1, indent)
             if not children:
                 raise ScriptError(f"Line {line_no}: block body cannot be empty")
-            output.append(text[:-1].rstrip() + ": " + "§".join(children))
+            output.append(_block_to_compact(text[:-1].rstrip(), children, line_no))
         else:
             output.append(text)
             index += 1
