@@ -22,6 +22,8 @@ class SetVariable:
 @dataclass(frozen=True, slots=True)
 class SendMessage:
     text: str
+    channel: str | None = None
+    role_mentions: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,7 +271,39 @@ def _parse_one(
 
     match = _SEND_STANDARD.fullmatch(statement) or _SEND_COMPACT.fullmatch(statement)
     if match:
-        return [SendMessage(_parse_value(match.group(1), line_number, variables))]
+        parts = _split_arguments(match.group(1))
+        if not 1 <= len(parts) <= 2:
+            raise ScriptError(f"Line {line_number}: send expects message text and an optional channel")
+        raw_text = parts[0].strip()
+        role_mentions = raw_text.startswith('f"') or raw_text.startswith("f'")
+        if role_mentions:
+            try:
+                parsed = ast.parse(raw_text[1:], mode="eval").body
+            except SyntaxError as exc:
+                raise ScriptError(f"Line {line_number}: invalid f-string") from exc
+            if not isinstance(parsed, ast.JoinedStr):
+                raise ScriptError(f"Line {line_number}: f must prefix a quoted string")
+            chunks: list[str] = []
+            for value in parsed.values:
+                if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                    chunks.append(value.value)
+                elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name):
+                    if value.value.id not in variables:
+                        raise ScriptError(f"Line {line_number}: unknown variable '{value.value.id}' in f-string")
+                    chunks.append(variables[value.value.id])
+                else:
+                    raise ScriptError(f"Line {line_number}: f-strings only support text and defined variables")
+            text_value = "".join(chunks)
+            if len(text_value) > 1800:
+                raise ScriptError(f"Line {line_number}: text is too long (maximum 1800 characters)")
+        else:
+            text_value = _parse_value(raw_text, line_number, variables)
+        channel = None
+        if len(parts) == 2:
+            channel = str(_parse_value(parts[1], line_number, variables)).strip()
+            if not channel:
+                raise ScriptError(f"Line {line_number}: target channel cannot be empty")
+        return [SendMessage(text_value, channel, role_mentions)]
 
     raise ScriptError(
         f"Line {line_number}: unknown instruction. Try let name = \"text\", "
