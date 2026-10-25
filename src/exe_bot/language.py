@@ -66,7 +66,7 @@ _ELSE_STANDARD = re.compile(r"^else\s*:\s*(.+)$")
 _ELSE_COMPACT = re.compile(r"^E\(\s*(.+)\s*\)$")
 _DISCORD_ACTIONS = {
     "ban": (2, 2), "unban": (1, 2), "kick": (1, 2),
-    "timeout": (2, 2), "untimeout": (1, 1),
+    "timeout": (2, 2), "untimeout": (1, 1), "give_role": (2, 2), "remove_role": (2, 2),
     "create_role": (1, 3), "delete_role": (1, 1),
     "create_category": (1, 2), "create_channel": (1, 3), "delete_channel": (1, 1),
     "slowmode": (1, 1), "clear": (1, 1),
