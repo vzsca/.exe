@@ -14,7 +14,7 @@ Implemented:
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
 - `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
-- `if greeting == "Hello": send("yes")` with an optional following `else: send("no")` line; compact `I(greeting, "Hello", m("yes"))` supports conditions without an else branch.
+- `if greeting == "Hello": send("yes")` with an optional following `else: send("no")` line; compact `I(greeting, "Hello", m("yes"))` supports an optional following `E(m("no"))` line for the else branch.
 - Owner-ID and SQLite-backed whitelist access checks.
 - Owner-only whitelist management: `!exe admin add @user`, `!exe admin remove @user`, and `!exe admin list`.
 - SQLite tables for custom scripts, event handlers, and whitelist entries.
@@ -47,6 +47,7 @@ v(greeting, "Hello")
 m(greeting)
 R(3, m(greeting))
 I(greeting, "Hello", m("Matched"))
+E(m("Not matched"))
 ```
 
 For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons can also separate instructions on a single line.
