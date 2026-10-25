@@ -94,3 +94,37 @@ def test_condition_requires_defined_variable():
 def test_condition_body_counts_towards_action_limit_even_when_false():
     with pytest.raises(ScriptError, match="limit of 1"):
         parse_script('let mode = "safe"\nif mode == "no": send("a")\nsend("b")', max_actions=1)
+
+
+
+def test_standard_else_runs_when_condition_is_false():
+    program = parse_script(
+        'let mode = "safe"\n'
+        'if mode == "admin": send("allowed")\n'
+        'else: send("denied")'
+    )
+    assert expand_actions(program) == [SendMessage("denied")]
+
+
+def test_standard_else_is_skipped_when_condition_is_true():
+    program = parse_script(
+        'let mode = "safe"\n'
+        'if mode == "safe": send("allowed")\n'
+        'else: send("denied")'
+    )
+    assert expand_actions(program) == [SendMessage("allowed")]
+
+
+def test_else_action_counts_towards_action_limit():
+    with pytest.raises(ScriptError, match="limit of 1"):
+        parse_script(
+            'let mode = "safe"\n'
+            'if mode == "safe": send("allowed")\n'
+            'else: send("denied")',
+            max_actions=1,
+        )
+
+
+def test_else_without_if_is_rejected():
+    with pytest.raises(ScriptError, match="else must immediately follow"):
+        parse_script('else: send("denied")')
