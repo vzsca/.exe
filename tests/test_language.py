@@ -359,7 +359,7 @@ def test_guild_inventory_functions_are_allowed_only_as_no_arg_fstring_calls():
         'send(f"Channels: {guilds_channels()}")\\n'
         'send(f"Categories: {guilds_categories()}")'
     )
-    assert len(program) == 4
+    assert len(program) == 8
     assert all(isinstance(item, DiscordAction) or isinstance(item, SendMessage) for item in program)
     with pytest.raises(ScriptError, match="takes no arguments"):
         parse_script('send(f"{guilds_roles(1)}")')
