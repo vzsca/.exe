@@ -166,3 +166,22 @@ send(f"Bienvenue {pseudo} !")
 ```
 
 La réponse est limitée à 1 800 caractères et l'attente est limitée par `SCRIPT_TIMEOUT_SECONDS`. Les réponses des autres membres ne sont pas utilisées.
+
+
+### Listes et dictionnaires
+
+Les variables peuvent contenir des listes et des dictionnaires simples, avec accès par index ou clé dans les f-strings :
+
+```python
+let users = ["Alice", "Bob"]
+let config = {"prefix": "!exe", "mode": "safe"}
+send(f"Premier : {users[0]} | Préfixe : {config['prefix']}")
+```
+
+Créer un rôle puis afficher sa mention directement :
+
+```python
+send(f"Rôle créé : {create_role('Testeurs')}")
+```
+
+La création de rôle vérifie les permissions Discord habituelles et n'autorise pas la permission administrateur. Les collections sont limitées à 100 éléments.
