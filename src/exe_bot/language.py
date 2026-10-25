@@ -146,11 +146,10 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     for line_number, statement in statements:
         parsed = _parse_one(statement, line_number, variables, 0)
         for instruction in parsed:
+            instructions.append(instruction)
             if isinstance(instruction, SetVariable):
                 variables[instruction.name] = instruction.value
-                instructions.append(instruction)
             else:
-                instructions.append(instruction)
                 action_budget += _count_actions(instruction)
                 if action_budget > max_actions:
                     raise ScriptError(f"Script exceeds the limit of {max_actions} actions")
@@ -166,3 +165,20 @@ def _count_actions(instruction: Instruction) -> int:
     if isinstance(instruction, SetVariable):
         return 0
     return instruction.count * sum(_count_actions(item) for item in instruction.body)
+
+
+def expand_actions(instructions: list[Instruction]) -> list[SendMessage]:
+    """Expand bounded repeats into the shared list of executable Discord actions."""
+    actions: list[SendMessage] = []
+
+    def expand(items: tuple[Instruction, ...] | list[Instruction]) -> None:
+        for item in items:
+            if isinstance(item, SendMessage):
+                actions.append(item)
+            elif isinstance(item, Repeat):
+                for _ in range(item.count):
+                    expand(item.body)
+            # Variables are resolved by the parser before execution.
+
+    expand(instructions)
+    return actions
