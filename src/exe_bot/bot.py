@@ -174,7 +174,7 @@ def build_bot(settings: Settings) -> ExeBot:
                 permissions=role_permissions,
                 reason=f".exe by {actor.id}",
             )
-            return created_role.mention
+            return f"@{created_role.name}"
         elif name == "delete_role":
             raw = str(args[0])
             role = guild.get_role(int(raw)) if raw.isdigit() else discord.utils.get(guild.roles, name=raw)
