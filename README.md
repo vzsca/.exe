@@ -154,3 +154,15 @@ A one-time code sent through Discord DM adds a confirmation step, but it is not 
 ## License
 
 License not selected yet.
+
+
+### Inputs interactifs
+
+Un script peut demander une réponse à la personne qui l'exécute. Le bot envoie la question dans le salon, puis attend le prochain message de cette même personne dans ce salon :
+
+```python
+let pseudo = input("Quel est ton pseudo ?")
+send(f"Bienvenue {pseudo} !")
+```
+
+La réponse est limitée à 1 800 caractères et l'attente est limitée par `SCRIPT_TIMEOUT_SECONDS`. Les réponses des autres membres ne sont pas utilisées.
