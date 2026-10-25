@@ -63,7 +63,7 @@ def build_bot(settings: Settings) -> ExeBot:
             "ban": "ban_members", "unban": "ban_members",
             "kick": "kick_members", "timeout": "moderate_members",
             "untimeout": "moderate_members", "create_role": "manage_roles",
-            "delete_role": "manage_roles", "create_channel": "manage_channels",
+            "delete_role": "manage_roles", "create_category": "manage_channels", "create_channel": "manage_channels",
             "delete_channel": "manage_channels", "slowmode": "manage_channels",
             "clear": "manage_messages",
         }
@@ -181,6 +181,51 @@ def build_bot(settings: Settings) -> ExeBot:
             if role.is_default() or role >= bot_member.top_role or (guild.owner_id != actor.id and role >= actor.top_role):
                 raise ScriptError("Discord role hierarchy prevents deleting that role.")
             await role.delete(reason=f".exe by {actor.id}")
+        elif name == "create_category":
+            category_name = str(args[0]).strip()
+            if not category_name or len(category_name) > 100:
+                raise ScriptError("Category name must contain 1 to 100 characters.")
+
+            overwrites = {}
+            if len(args) >= 2 and str(args[1]).strip():
+                allowed_channel_permissions = {
+                    "view_channel", "send_messages", "read_message_history",
+                    "embed_links", "attach_files", "add_reactions", "use_external_emojis",
+                    "manage_messages", "manage_channels", "connect", "speak", "stream",
+                    "use_voice_activation", "send_messages_in_threads",
+                    "create_public_threads", "create_private_threads", "send_polls",
+                }
+                # Format: "@everyone:view_channel=deny, Moderators:view_channel=allow"
+                for entry in str(args[1]).split(","):
+                    entry = entry.strip()
+                    match = re.fullmatch(r"(.+?):([a-z_]+)=(allow|deny)", entry, re.IGNORECASE)
+                    if not match:
+                        raise ScriptError(
+                            'Category permissions use "role:permission=allow|deny", '
+                            'for example "@everyone:view_channel=deny".'
+                        )
+                    target_name, permission, decision = match.groups()
+                    target_name = target_name.strip()
+                    permission = permission.lower()
+                    decision = decision.lower()
+                    if permission not in allowed_channel_permissions:
+                        raise ScriptError(f"Unsupported category permission: {permission}.")
+                    if target_name == "@everyone":
+                        target = guild.default_role
+                    elif target_name.isdigit():
+                        target = guild.get_role(int(target_name))
+                    else:
+                        target = discord.utils.get(guild.roles, name=target_name)
+                    if target is None:
+                        raise ScriptError(f"Could not find category permission target role: {target_name}.")
+                    overwrite = overwrites.setdefault(target, discord.PermissionOverwrite())
+                    setattr(overwrite, permission, decision == "allow")
+
+            await guild.create_category(
+                category_name,
+                overwrites=overwrites or None,
+                reason=f".exe by {actor.id}",
+            )
         elif name == "create_channel":
             channel_name = str(args[0]).strip()
             if not channel_name or len(channel_name) > 100:
@@ -200,7 +245,7 @@ def build_bot(settings: Settings) -> ExeBot:
                 allowed_channel_permissions = {
                     "view_channel", "send_messages", "read_message_history",
                     "embed_links", "attach_files", "add_reactions", "use_external_emojis",
-                    "manage_messages", "manage_channels", "manage_permissions",
+                    "manage_messages", "manage_channels",
                     "connect", "speak", "stream", "use_voice_activation",
                     "send_messages_in_threads", "create_public_threads",
                     "create_private_threads", "send_polls",
