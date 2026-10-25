@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 class Settings:
     token: str
     owner_id: int
-    whitelist_ids: frozenset[int]
     script_timeout_seconds: float = 5.0
     max_script_actions: int = 20
+    database_path: str = "data/exe.sqlite3"
 
 
 def _positive_float(name: str, default: float) -> float:
@@ -50,19 +50,14 @@ def load_settings() -> Settings:
     if owner_id <= 0:
         raise RuntimeError("OWNER_ID must be a positive Discord user ID")
 
-    whitelist: set[int] = set()
-    for item in os.getenv("WHITELIST_IDS", "").split(","):
-        item = item.strip()
-        if item:
-            try:
-                whitelist.add(int(item))
-            except ValueError as exc:
-                raise RuntimeError("WHITELIST_IDS must be comma-separated numeric IDs") from exc
+    database_path = os.getenv("DATABASE_PATH", "data/exe.sqlite3").strip()
+    if not database_path:
+        raise RuntimeError("DATABASE_PATH must not be empty")
 
     return Settings(
         token=token,
         owner_id=owner_id,
-        whitelist_ids=frozenset(whitelist),
         script_timeout_seconds=_positive_float("SCRIPT_TIMEOUT_SECONDS", 5.0),
         max_script_actions=_positive_int("MAX_SCRIPT_ACTIONS", 20),
+        database_path=database_path,
     )
