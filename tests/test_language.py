@@ -255,7 +255,7 @@ def test_nested_repeat_can_contain_multiple_actions():
 
 
 def test_indented_repeat_supports_multiple_actions():
-    program = parse_script('repeat 2:\\n    send("start")\\n    send("end")')
+    program = parse_script('repeat 2:\n    send("start")\n    send("end")')
     assert expand_actions(program) == [
         SendMessage("start"), SendMessage("end"),
         SendMessage("start"), SendMessage("end"),
@@ -264,9 +264,9 @@ def test_indented_repeat_supports_multiple_actions():
 
 def test_nested_indented_blocks_are_supported():
     program = parse_script(
-        'repeat 2:\\n'
-        '    send("outer")\\n'
-        '    repeat 2:\\n'
+        'repeat 2:\n'
+        '    send("outer")\n'
+        '    repeat 2:\n'
         '        send("inner")'
     )
     assert expand_actions(program) == [
@@ -277,11 +277,11 @@ def test_nested_indented_blocks_are_supported():
 
 def test_indented_if_else_blocks_are_supported():
     program = parse_script(
-        'let mode = "safe"\\n'
-        'if mode == "admin":\\n'
-        '    send("admin")\\n'
-        '    send("second admin message")\\n'
-        'else:\\n'
+        'let mode = "safe"\n'
+        'if mode == "admin":\n'
+        '    send("admin")\n'
+        '    send("second admin message")\n'
+        'else:\n'
         '    send("safe")'
     )
     assert expand_actions(program) == [SendMessage("safe")]
@@ -289,9 +289,9 @@ def test_indented_if_else_blocks_are_supported():
 
 def test_unexpected_indentation_is_rejected():
     with pytest.raises(ScriptError, match="unexpected indentation"):
-        parse_script('send("one")\\n    send("two")')
+        parse_script('send("one")\n    send("two")')
 
 
 def test_empty_indented_block_is_rejected():
     with pytest.raises(ScriptError, match="block body cannot be empty"):
-        parse_script('repeat 2:\\nsend("not indented")')
+        parse_script('repeat 2:\nsend("not indented")')
