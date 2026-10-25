@@ -34,6 +34,7 @@ class Repeat:
 class IfEquals:
     matched: bool
     body: tuple["Instruction", ...]
+    else_body: tuple["Instruction", ...] = ()
 
 
 Instruction = SetVariable | SendMessage | Repeat | IfEquals
@@ -46,6 +47,7 @@ _REPEAT_STANDARD = re.compile(r"^repeat\s+(\d+)\s*:\s*(.+)$")
 _REPEAT_COMPACT = re.compile(r"^R\(\s*(\d+)\s*,\s*(.+)\s*\)$")
 _IF_STANDARD = re.compile(rf"^if\s+({_NAME})\s*==\s*(.+?)\s*:\s*(.+)$")
 _IF_COMPACT = re.compile(rf"^I\(\s*({_NAME})\s*,\s*(.+?)\s*,\s*(.+)\s*\)$")
+_ELSE_STANDARD = re.compile(r"^else\s*:\s*(.+)$")
 _MAX_REPEAT = 10
 _MAX_DEPTH = 4
 
@@ -161,18 +163,27 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
 
     variables: dict[str, str] = {}
     instructions: list[Instruction] = []
-    action_budget = 0
-
     for line_number, statement in statements:
+        else_match = _ELSE_STANDARD.fullmatch(statement)
+        if else_match:
+            if not instructions or not isinstance(instructions[-1], IfEquals):
+                raise ScriptError(f"Line {line_number}: else must immediately follow an if condition")
+            previous = instructions[-1]
+            if previous.else_body:
+                raise ScriptError(f"Line {line_number}: an if condition can only have one else")
+            else_body = _parse_one(else_match.group(1).strip(), line_number, variables, 1)
+            instructions[-1] = IfEquals(previous.matched, previous.body, tuple(else_body))
+            continue
+
         parsed = _parse_one(statement, line_number, variables, 0)
         for instruction in parsed:
             instructions.append(instruction)
             if isinstance(instruction, SetVariable):
                 variables[instruction.name] = instruction.value
-            else:
-                action_budget += _count_actions(instruction)
-                if action_budget > max_actions:
-                    raise ScriptError(f"Script exceeds the limit of {max_actions} actions")
+
+    action_budget = sum(_count_actions(instruction) for instruction in instructions)
+    if action_budget > max_actions:
+        raise ScriptError(f"Script exceeds the limit of {max_actions} actions")
 
     if not any(not isinstance(item, SetVariable) for item in instructions):
         raise ScriptError("Script has no actions")
@@ -185,9 +196,10 @@ def _count_actions(instruction: Instruction) -> int:
     if isinstance(instruction, SetVariable):
         return 0
     if isinstance(instruction, IfEquals):
-        # Count the body even when the condition is false, so dead branches
-        # cannot be used to bypass the configured source action budget.
-        return sum(_count_actions(item) for item in instruction.body)
+        # Count both branches so conditionals cannot bypass the action budget.
+        return sum(_count_actions(item) for item in instruction.body) + sum(
+            _count_actions(item) for item in instruction.else_body
+        )
     return instruction.count * sum(_count_actions(item) for item in instruction.body)
 
 
@@ -202,8 +214,8 @@ def expand_actions(instructions: list[Instruction]) -> list[SendMessage]:
             elif isinstance(item, Repeat):
                 for _ in range(item.count):
                     expand(item.body)
-            elif isinstance(item, IfEquals) and item.matched:
-                expand(item.body)
+            elif isinstance(item, IfEquals):
+                expand(item.body if item.matched else item.else_body)
             # Variables and conditions are resolved by the parser before execution.
 
     expand(instructions)
