@@ -15,6 +15,7 @@ from .storage import Database, StorageError
 log = logging.getLogger(__name__)
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
 _CREATE_RE = re.compile(r"^create\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s*::\s*(.+)$", re.IGNORECASE | re.DOTALL)
+_NAME_COMMAND_RE = re.compile(r"^(run|delete)\s+([A-Za-z][A-Za-z0-9_-]{0,31})$", re.IGNORECASE)
 
 
 def _strip_fence(source: str) -> str:
@@ -155,9 +156,48 @@ def build_bot(settings: Settings) -> ExeBot:
                 await ctx.reply(f"Could not create script: {exc}", mention_author=False)
                 return
             await ctx.reply(
-                f"Script `{name}` created and saved. Running and managing saved scripts will be added later.",
+                f"Script `{name}` created and saved. Use `!exe run {name}` to execute it.",
                 mention_author=False,
             )
+            return
+
+        # List saved scripts owned by the caller.
+        if cleaned.lower() == "list":
+            names = bot.db.list_scripts(ctx.author.id)
+            if not names:
+                response = 'You have no saved scripts. Create one with !exe create hello :: send("Hello").'
+            else:
+                visible = names[:50]
+                response = "Your saved scripts: " + ", ".join(f"`{name}`" for name in visible)
+                if len(names) > len(visible):
+                    response += f" (and {len(names) - len(visible)} more)"
+            await ctx.reply(response, mention_author=False)
+            return
+
+        # Saved scripts are scoped to the caller's Discord ID.
+        name_match = _NAME_COMMAND_RE.fullmatch(cleaned)
+        if name_match:
+            operation, name = name_match.groups()
+            operation = operation.lower()
+            try:
+                if operation == "run":
+                    source = bot.db.get_script(ctx.author.id, name)
+                    if source is None:
+                        await ctx.reply(
+                            f"No saved script named `{name}` belongs to your account.",
+                            mention_author=False,
+                        )
+                        return
+                    await run_source(ctx, source)
+                else:
+                    deleted = bot.db.delete_script(ctx.author.id, name)
+                    response = (
+                        f"Script `{name}` deleted." if deleted
+                        else f"No saved script named `{name}` belongs to your account."
+                    )
+                    await ctx.reply(response, mention_author=False)
+            except StorageError as exc:
+                await ctx.reply(str(exc), mention_author=False)
             return
 
         # A plain !exe message runs the source directly.
@@ -168,7 +208,8 @@ def build_bot(settings: Settings) -> ExeBot:
         await ctx.reply(
             'Run: !exe send("Hello")\n'
             'Create and save: !exe create greeting :: send("Hello")\n'
-            'Saved-script running and management are not implemented yet.\n'
+            'List scripts: !exe list\n'
+            'Run / delete saved: !exe run greeting / !exe delete greeting\n'
             'Standard: let greeting = "Hello"; send(greeting)\n'
             'Compact: v(greeting, "Hello"); m(greeting)\n'
             'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
