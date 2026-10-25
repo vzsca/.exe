@@ -28,7 +28,7 @@ HELP_TEXT = (
     'Compact condition: I(greeting, "Hello", m("yes")); compact else on next line: E(m("no"))\n'
     'Repeat: repeat 3: send(greeting) or repeat 3 as i: send(f"{i}") or R(3, m(greeting))\n'
     'Server actions: ban(id, "reason"), unban(id), kick(id, "reason"), timeout(id, minutes), untimeout(id)\n'
-    'Roles/channels: create_role("name"), delete_role(id_or_exact_name), create_channel("name"), delete_channel(id_or_exact_name)\n'
+    'Roles: create_role("name"), give_role(member_id, role_id_or_exact_name), remove_role(member_id, role_id_or_exact_name), delete_role(id_or_exact_name)\n'\n    'Channels: create_channel("name"), delete_channel(id_or_exact_name)\n'
     'Read-only lists: send(f"{guilds_roles()}"), send(f"{guilds_members()}"), send(f"{guilds_channels()}"), send(f"{guilds_categories()}")\n'
     'Member list requires Server Members Intent; output is capped at 100 members.\n'
     'Moderation: slowmode(seconds), clear(count); requires matching Discord permissions and bot role access.\n'
