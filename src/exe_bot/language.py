@@ -264,8 +264,8 @@ def _parse_one(
         input_match = re.fullmatch(r"""input\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\)""", raw_value.strip())
         if input_match:
             question = _parse_value(input_match.group(1), line_number, variables)
-            if not question:
-                raise ScriptError(f"Line {line_number}: input question cannot be empty")
+            if not isinstance(question, str) or not question:
+                raise ScriptError(f"Line {line_number}: input question must be non-empty text")
             return [InputVariable(name, question)]
         return [SetVariable(name, _parse_value(raw_value, line_number, variables))]
 
