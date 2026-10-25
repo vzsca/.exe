@@ -187,7 +187,22 @@ def build_bot(settings: Settings) -> ExeBot:
                         allowed_mentions=discord.AllowedMentions.none(),
                     )
                 elif isinstance(action, DiscordAction):
-                    await execute_discord_action(ctx, action)
+                    try:
+                        await execute_discord_action(ctx, action)
+                    except discord.Forbidden as exc:
+                        log.warning(
+                            "Discord denied .exe action %s in guild %s (channel %s), actor %s, target args %r: %s",
+                            action.name,
+                            ctx.guild.id if ctx.guild else "DM",
+                            ctx.channel.id,
+                            ctx.author.id,
+                            action.arguments,
+                            getattr(exc, "text", str(exc)),
+                        )
+                        raise ScriptError(
+                            f"Discord refused '{action.name}'. Verify the bot's Moderate Members permission "
+                            "and that its role is above the target member. Check the bot logs for details."
+                        ) from exc
 
         try:
             await asyncio.wait_for(execute_actions(), timeout=settings.script_timeout_seconds)
@@ -197,8 +212,19 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
         except ScriptError as exc:
             await ctx.reply(f"Action refused: {exc}", mention_author=False)
-        except discord.Forbidden:
-            await ctx.reply("I do not have permission to perform that action here.", mention_author=False)
+        except discord.Forbidden as exc:
+            log.warning(
+                "Discord denied .exe action outside its action handler in guild %s (channel %s), actor %s: %s",
+                ctx.guild.id if ctx.guild else "DM",
+                ctx.channel.id,
+                ctx.author.id,
+                getattr(exc, "text", str(exc)),
+            )
+            await ctx.reply(
+                "Discord refused this action. Check the bot's effective permissions and role hierarchy; "
+                "details were written to the bot log.",
+                mention_author=False,
+            )
         except discord.HTTPException:
             await ctx.reply("Discord rejected an action in this script.", mention_author=False)
         return False
