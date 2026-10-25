@@ -397,3 +397,12 @@ def test_give_role_and_remove_role_actions_parse_member_and_role_targets():
     assert parse_script('remove_role("123456789012345678", "987654321098765432")') == [
         DiscordAction("remove_role", ("123456789012345678", "987654321098765432"))
     ]
+
+
+def test_give_role_and_remove_role_accept_discord_user_and_role_mentions():
+    assert parse_script('give_role("<@123456789012345678>", "<@&987654321098765432>")') == [
+        DiscordAction("give_role", ("<@123456789012345678>", "<@&987654321098765432>"))
+    ]
+    assert parse_script('remove_role("<@!123456789012345678>", "<@&987654321098765432>")') == [
+        DiscordAction("remove_role", ("<@!123456789012345678>", "<@&987654321098765432>"))
+    ]
