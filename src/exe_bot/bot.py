@@ -223,7 +223,7 @@ def build_bot(settings: Settings) -> ExeBot:
 
             await guild.create_category(
                 category_name,
-                overwrites=overwrites or None,
+                overwrites=overwrites,
                 reason=f".exe by {actor.id}",
             )
         elif name == "create_channel":
