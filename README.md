@@ -12,6 +12,7 @@ Both syntaxes compile into the same internal instruction types and use the same 
 Implemented:
 - `send("Hello")` / compact `m("Hello")` to send a message. An optional second argument targets a text channel by exact name or ID, e.g. `send("Hello", "#general")` or `send("Hello", "123456789012345678")`.
 - Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `create_role`, `delete_role`, `create_category`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
+- Read-only server inventory in f-strings: `guilds_roles()`, `guilds_members()`, `guilds_channels()`, and `guilds_categories()`. Results include names and IDs; member results are capped at 100.
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
 - `send(f"Salut @Moderateurs")` allows an explicit role mention by exact role name or ID. F-strings only support literal text and defined variables such as `{greeting}`; they do not execute Python expressions. User and `@everyone` mentions remain blocked.
@@ -132,7 +133,7 @@ These actions require the matching native Discord permission from both the user 
 2. On Windows, run `start_bot.bat`; on Linux/macOS, run `chmod +x start_bot.sh && ./start_bot.sh`.
 3. The launcher creates `venv`, installs dependencies, and copies `.env.example` to `.env` if needed.
 4. In the panel, use `set_token` and `set_owner` to configure the bot. The token is entered with hidden input.
-5. In the Discord Developer Portal, enable **Message Content Intent** for the bot.
+5. In the Discord Developer Portal, enable **Message Content Intent** and **Server Members Intent**. The latter is required by `guilds_members()`.
 6. Use `start`, `stop`, `restart`, `status`, or `uptime` in the panel. Logs are available with `logs`.
 
 The SQLite file is created automatically at `DATABASE_PATH` (default: `data/exe.sqlite3`).
@@ -159,9 +160,14 @@ Each saved script is private to the Discord user who created it; the commands do
 
 A one-time code sent through Discord DM adds a confirmation step, but it is not independent multi-factor authentication if the Discord account itself is compromised. Sensitive actions must still require strict owner checks and short-lived, single-use challenges.
 
+## Legal documents
+
+- [Conditions d’utilisation](TERMS_OF_USE.md)
+- [Politique de confidentialité](PRIVACY_POLICY.md)
+
 ## License
 
-License not selected yet.
+This project is licensed under the [MIT License](LICENSE).
 
 
 ### Inputs interactifs
@@ -175,6 +181,19 @@ send(f"Bienvenue {pseudo} !")
 
 La réponse est limitée à 1 800 caractères et l'attente est limitée par `SCRIPT_TIMEOUT_SECONDS`. Les réponses des autres membres ne sont pas utilisées.
 
+
+### Inventaire du serveur
+
+Ces fonctions en lecture seule affichent les noms et ID du serveur courant :
+
+```text
+send(f"Rôles : {guilds_roles()}")
+send(f"Membres : {guilds_members()}")
+send(f"Salons : {guilds_channels()}")
+send(f"Catégories : {guilds_categories()}")
+```
+
+La liste des membres est limitée à 100 résultats. Active **Server Members Intent** dans le portail développeur Discord puis redémarre le bot.
 
 ### Listes et dictionnaires
 
