@@ -1,7 +1,6 @@
 import pytest
 
 from exe_bot.language import (
-    Repeat,
     ScriptError,
     SendMessage,
     SetVariable,
@@ -66,5 +65,5 @@ def test_unknown_variable_is_reported():
 
 
 def test_repeat_expansion_respects_action_limit():
-    with pytest.raises(ScriptError, match="limit of 5"):
-        parse_script('repeat 3: send("x")\nsend("y")\nsend("z")', max_actions=5)
+    with pytest.raises(ScriptError, match="limit of 4"):
+        parse_script('repeat 3: send("x")\nsend("y")\nsend("z")', max_actions=4)
