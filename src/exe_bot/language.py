@@ -87,13 +87,17 @@ def _parse_value(source: str, line_number: int, variables: dict[str, str]) -> st
 
 
 def _split_statements(source: str) -> list[tuple[int, str]]:
-    """Split statements on newlines or semicolons, preserving quoted strings."""
+    """Split instructions on top-level newlines, semicolons, or § separators."""
     statements: list[tuple[int, str]] = []
+    quote: str | None = None
+    escaped = False
+    paren_depth = 0
+    current: list[str] = []
+    statement_line = 1
+
     for line_number, raw_line in enumerate(source.splitlines(), start=1):
-        parts: list[str] = []
-        current: list[str] = []
-        quote: str | None = None
-        escaped = False
+        if not current:
+            statement_line = line_number
         for char in raw_line:
             if escaped:
                 current.append(char)
@@ -108,17 +112,57 @@ def _split_statements(source: str) -> list[tuple[int, str]]:
                     quote = char
                 elif quote == char:
                     quote = None
-            if char in (";", "§") and quote is None:
-                parts.append("".join(current).strip())
+            elif quote is None:
+                if char == "(":
+                    paren_depth += 1
+                elif char == ")":
+                    if paren_depth == 0:
+                        raise ScriptError("Unexpected closing parenthesis in script")
+                    paren_depth -= 1
+
+            if char in (";", "§") and quote is None and paren_depth == 0:
+                part = "".join(current).strip()
+                if part and not part.startswith("#"):
+                    statements.append((statement_line, part))
                 current = []
+                statement_line = line_number
             else:
                 current.append(char)
-        parts.append("".join(current).strip())
-        for part in parts:
+
+        if quote is None and paren_depth == 0:
+            part = "".join(current).strip()
             if part and not part.startswith("#"):
-                statements.append((line_number, part))
+                statements.append((statement_line, part))
+            current = []
+        else:
+            current.append("\n")
+
+    part = "".join(current).strip()
+    if part and not part.startswith("#"):
+        statements.append((statement_line, part))
+    if quote is not None:
+        raise ScriptError("Unclosed quote in script")
+    if paren_depth != 0:
+        raise ScriptError("Unclosed parenthesis in script")
     return statements
 
+
+def _parse_body(
+    source: str,
+    line_number: int,
+    variables: dict[str, str],
+    depth: int,
+) -> list[Instruction]:
+    """Parse multiple nested instructions while sharing the current variables."""
+    statements = _split_statements(source)
+    body: list[Instruction] = []
+    for _, statement in statements:
+        parsed = _parse_one(statement, line_number, variables, depth)
+        body.extend(parsed)
+        for instruction in parsed:
+            if isinstance(instruction, SetVariable):
+                variables[instruction.name] = instruction.value
+    return body
 
 def _split_arguments(source: str) -> list[str]:
     parts: list[str] = []
@@ -203,7 +247,7 @@ def _parse_one(
         if variable_name not in variables:
             raise ScriptError(f"Line {line_number}: unknown variable '{variable_name}'")
         expected = _parse_value(raw_expected, line_number, variables)
-        body = _parse_one(body_source.strip(), line_number, variables, depth + 1)
+        body = _parse_body(body_source.strip(), line_number, variables, depth + 1)
         if not body:
             raise ScriptError(f"Line {line_number}: if body cannot be empty")
         return [IfEquals(variables[variable_name] == expected, tuple(body))]
@@ -214,7 +258,7 @@ def _parse_one(
         count = int(raw_count)
         if not 1 <= count <= _MAX_REPEAT:
             raise ScriptError(f"Line {line_number}: repeat count must be between 1 and {_MAX_REPEAT}")
-        body = _parse_one(body_source.strip(), line_number, variables, depth + 1)
+        body = _parse_body(body_source.strip(), line_number, variables, depth + 1)
         if not body:
             raise ScriptError(f"Line {line_number}: repeat body cannot be empty")
         return [Repeat(count, tuple(body))]
