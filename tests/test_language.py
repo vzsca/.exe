@@ -349,3 +349,15 @@ def test_create_role_can_be_called_inside_f_string():
 def test_list_and_dictionary_are_bounded():
     with pytest.raises(ScriptError, match="limited to 100"):
         parse_script('let users = ' + repr(list(range(101))) + '\nsend("ok")')
+
+
+def test_counted_loop_interpolates_role_names_and_keeps_ping_actions():
+    program = parse_script('repeat 3 as i: send(f"{create_role(\'role {i}\')}")')
+    assert program == [
+        DiscordAction("create_role", ("role 1",), "__exe_result_0"),
+        SendMessage("__EXE_VAR___exe_result_0__", None, True),
+        DiscordAction("create_role", ("role 2",), "__exe_result_0"),
+        SendMessage("__EXE_VAR___exe_result_0__", None, True),
+        DiscordAction("create_role", ("role 3",), "__exe_result_0"),
+        SendMessage("__EXE_VAR___exe_result_0__", None, True),
+    ]
