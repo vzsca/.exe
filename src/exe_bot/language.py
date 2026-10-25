@@ -265,7 +265,7 @@ def _parse_one(
         if input_match:
             question = _parse_value(input_match.group(1), line_number, variables)
             if not isinstance(question, str) or not question:
-                raise ScriptError(f"Line {line_number}: input question must be non-empty text")
+                raise ScriptError(f"Line {line_number}: input question cannot be empty and must be text")
             return [InputVariable(name, question)]
         return [SetVariable(name, _parse_value(raw_value, line_number, variables))]
 
@@ -341,12 +341,14 @@ def _parse_one(
                     deferred_actions.append(DiscordAction("create_role", tuple(args), result_name))
                     chunks.append(f"__EXE_VAR_{result_name}__")
                 else:
-                    raise ScriptError(f"Line {line_number}: f-strings support text, variables, list/dictionary indexing, and create_role(...)")
+                    raise ScriptError(f"Line {line_number}: f-strings only support text and defined variables, list/dictionary indexing, and create_role(...)")
             text_value = "".join(chunks)
             if len(text_value) > 1800:
                 raise ScriptError(f"Line {line_number}: text is too long (maximum 1800 characters)")
         else:
             text_value = _parse_value(raw_text, line_number, variables)
+            if not isinstance(text_value, str):
+                raise ScriptError(f"Line {line_number}: send expects text strings")
         channel = None
         if len(parts) == 2:
             channel = str(_parse_value(parts[1], line_number, variables)).strip()
