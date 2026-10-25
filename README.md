@@ -19,10 +19,11 @@ Implemented:
 - SQLite tables for custom scripts, event handlers, and whitelist entries.
 - Limits on script size, action count, message size, repeat count/depth, and execution time.
 - Create and save named scripts directly in Discord after syntax validation.
+- List, run, and delete a user's own saved scripts; saved scripts are revalidated and use the same execution limits as direct scripts.
 - Script-generated messages cannot ping users or roles.
 - Automated parser and storage tests, plus a GitHub Actions test workflow.
 
-Still to build: commands to list, run, and delete saved scripts; conditionals, richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
+Still to build: conditionals, richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
 
 ## Syntax examples
 
@@ -76,12 +77,15 @@ Only the configured owner and whitelisted users can use script commands.
 
 - `!exe <script>` — run a script immediately.
 - `!exe create <name> :: <script>` — validate and save a named script without running it.
+- `!exe list` — list your saved scripts.
+- `!exe run <name>` — run one of your saved scripts.
+- `!exe delete <name>` — delete one of your saved scripts.
 - `!help_exe` — show command and syntax help.
 - `!exe admin add @user`, `!exe admin remove @user`, `!exe admin list` — owner-only whitelist management.
 
 Example: `!exe create hello :: let greeting = "Hello"; send(greeting)`.
 
-Saved-script listing, execution, and deletion are intentionally not implemented yet.
+Each saved script is private to the Discord user who created it; the commands do not let users run or delete another user's scripts.
  
 ## Security note
 
