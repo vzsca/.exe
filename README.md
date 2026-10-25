@@ -9,15 +9,16 @@ Both syntaxes must compile to the same internal representation and use the same 
 
 ## Status
 
-Early foundation. The first milestone is a safe interpreter core; Discord actions, persistent custom commands, event handlers, and `sudo` verification will be added incrementally.
+Early foundation. The current prototype supports only sending a text message, using either `send("Hello")` or compact `m("Hello")`. Variables, control flow, Discord administration actions, persistent scripts, event handlers, and `sudo` verification are not implemented yet.
 
-## Principles
+## Security principles
 
 - No `eval`, `exec`, arbitrary Python, OS shell access, or unrestricted file access.
 - Scripts can only call explicitly registered actions.
 - Owner identity is verified using the configured Discord user ID, not server Administrator permissions.
 - Whitelist access does not grant owner privileges.
-- Runtime, loop, and action limits protect the bot and server.
+- Script size, action count, message size, and runtime are limited.
+- Script-generated messages do not trigger user or role mentions.
 - Secrets belong in `.env`, never in source control.
 
 ## Requirements
@@ -27,11 +28,23 @@ Early foundation. The first milestone is a safe interpreter core; Discord action
 
 ## Setup
 
-1. Clone this repository.
+1. Clone the repository and enter its folder.
 2. Create and activate a virtual environment.
-3. Install dependencies with `python -m pip install -r requirements.txt`.
-4. Copy `.env.example` to `.env` and fill in the values.
-5. Start with `python -m exe_bot` from the `src` directory, or install the project in editable mode once packaging is added.
+3. Install the project: `python -m pip install -e .`
+4. Copy `.env.example` to `.env` and fill in `DISCORD_TOKEN` and `OWNER_ID`.
+5. In the Discord Developer Portal, enable **Message Content Intent** for the bot.
+6. Start it with `python -m exe_bot`.
+
+Run tests with `python -m pip install -r requirements-dev.txt`, then `python -m pytest`.
+
+## Test syntax
+
+- Standard: `!exe send("Hello")`
+- Compact: `!exe m("Hello")`
+
+For a multiline script, put the instructions in a fenced code block after `!exe`.
+
+The language is intentionally limited at this stage. Unsupported instructions return a line-specific syntax error instead of being executed as Python.
 
 ## Planned command concepts
 
@@ -39,7 +52,7 @@ Early foundation. The first milestone is a safe interpreter core; Discord action
 - `!exe admin add @user` — owner-only whitelist management.
 - `sudo` — additional confirmation for sensitive owner actions.
 
-Command names and syntax are provisional until the first language specification is settled.
+Command names and syntax are provisional until the language specification is settled.
 
 ## Security note
 
