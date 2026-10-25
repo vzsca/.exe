@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import timedelta
 import re
 
 import discord
@@ -79,7 +80,7 @@ def build_bot(settings: Settings) -> ExeBot:
             return int(match.group(1) or match.group(2))
 
         reason = str(args[1]) if len(args) > 1 else f".exe script by {actor} ({actor.id})"
-        if name in {"ban", "kick", "timeout", "untimeout"}:
+        if name in {"ban", "unban", "kick", "timeout", "untimeout"}:
             user_id = target_id(args[0])
             member = guild.get_member(user_id)
             if name == "unban":
@@ -112,7 +113,7 @@ def build_bot(settings: Settings) -> ExeBot:
                 minutes = args[1]
                 if not isinstance(minutes, int) or not 1 <= minutes <= 40320:
                     raise ScriptError("timeout duration must be an integer from 1 to 40320 minutes.")
-                await member.timeout(discord.utils.utcnow() + __import__("datetime").timedelta(minutes=minutes), reason=f".exe by {actor.id}")
+                await member.timeout(discord.utils.utcnow() + timedelta(minutes=minutes), reason=f".exe by {actor.id}")
             else:
                 await member.timeout(None, reason=f".exe by {actor.id}")
             return
@@ -330,6 +331,9 @@ def build_bot(settings: Settings) -> ExeBot:
             'Condition: if greeting == "Hello": send("yes"); optional next line: else: send("no")\n'
             'Compact condition: I(greeting, "Hello", m("yes")); compact else on next line: E(m("no"))\n'
             'Repeat: repeat 3: send(greeting) or R(3, m(greeting))\n'
+            'Server actions: ban(id, "reason"), unban(id), kick(id, "reason"), timeout(id, minutes), untimeout(id)\n'
+            'Roles/channels: create_role("name"), delete_role(id_or_exact_name), create_channel("name"), delete_channel(id_or_exact_name)\n'
+            'Moderation: slowmode(seconds), clear(count); requires matching Discord permissions and bot role access.\n'
             'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.',
             mention_author=False,
         )
