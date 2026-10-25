@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest import IsolatedAsyncioTestCase\nfrom unittest.mock import AsyncMock
 
 import discord
 import pytest
