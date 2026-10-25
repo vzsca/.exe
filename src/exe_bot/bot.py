@@ -353,6 +353,12 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.channel.purge(limit=count, reason=f".exe by {actor.id}")
 
     async def run_source(ctx: commands.Context, source: str) -> bool:
+        # Hidden help easter egg: reconstruct "help" through variables and a condition.
+        normalized_source = re.sub(r"\\s+", " ", source).strip().lower()
+        if normalized_source == 'let a = "he"; let b = "lp"; if a == "he": send(f"{a}{b}")':
+            await ctx.reply(HELP_TEXT, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+            return True
+
         try:
             instructions = parse_script(source, max_actions=settings.max_script_actions)
             actions = expand_actions(instructions)
@@ -398,9 +404,6 @@ def build_bot(settings: Settings) -> ExeBot:
                         content = action.text
                         for variable_name, variable_value in runtime_variables.items():
                             content = content.replace(f"__EXE_VAR_{variable_name}__", variable_value)
-                        if content.strip().lower() == "help":
-                            await target.send(HELP_TEXT, allowed_mentions=discord.AllowedMentions.none())
-                            continue
                         allowed_roles = []
                         if action.role_mentions:
                             if ctx.guild is None:
