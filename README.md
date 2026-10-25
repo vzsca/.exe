@@ -14,6 +14,7 @@ Implemented:
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
 - `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
+- `if greeting == "Hello": send("yes")` / compact `I(greeting, "Hello", m("yes"))` for equality conditions.
 - Owner-ID and SQLite-backed whitelist access checks.
 - Owner-only whitelist management: `!exe admin add @user`, `!exe admin remove @user`, and `!exe admin list`.
 - SQLite tables for custom scripts, event handlers, and whitelist entries.
@@ -23,7 +24,7 @@ Implemented:
 - Script-generated messages cannot ping users or roles.
 - Automated parser and storage tests, plus a GitHub Actions test workflow.
 
-Still to build: conditionals, richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
+Still to build: alternate branches (`else`), richer values and expressions, Discord administration actions, event-handler commands and execution, and `sudo` verification.
 
 ## Syntax examples
 
@@ -33,6 +34,7 @@ Standard:
 let greeting = "Hello"
 send(greeting)
 repeat 3: send(greeting)
+if greeting == "Hello": send("Matched")
 ```
 
 Compact:
@@ -41,6 +43,7 @@ Compact:
 v(greeting, "Hello")
 m(greeting)
 R(3, m(greeting))
+I(greeting, "Hello", m("Matched"))
 ```
 
 For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons can also separate instructions on a single line.
