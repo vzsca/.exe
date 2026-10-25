@@ -56,6 +56,14 @@ else:
 
 Nested blocks are supported, and indentation must be consistent. Blocks cannot be empty.
 
+Counted loops can define a 1-based counter with `repeat 3 as i: ...`. For example:
+
+```text
+repeat 3 as i: send(f"{create_role('role {i}')}")
+```
+
+This creates `role 1`, `role 2`, and `role 3`, then sends each created role's mention.
+
 Compact:
 
 ```text
