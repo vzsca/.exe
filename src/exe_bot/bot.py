@@ -14,7 +14,7 @@ from .storage import Database, StorageError
 
 log = logging.getLogger(__name__)
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
-_SAVE_RE = re.compile(r"^save\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s*::\s*(.+)$", re.IGNORECASE | re.DOTALL)
+_CREATE_RE = re.compile(r"^create\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s*::\s*(.+)$", re.IGNORECASE | re.DOTALL)
 _NAME_COMMAND_RE = re.compile(r"^(run|delete)\s+([A-Za-z][A-Za-z0-9_-]{0,31})$", re.IGNORECASE)
 
 
@@ -144,52 +144,21 @@ def build_bot(settings: Settings) -> ExeBot:
             )
             return
 
-        # Save a validated script without executing it.
-        save_match = _SAVE_RE.fullmatch(cleaned)
-        if save_match:
-            name, source = save_match.groups()
+        # Creation stores a validated script; it does not execute it.
+        create_match = _CREATE_RE.fullmatch(cleaned)
+        if create_match:
+            name, source = create_match.groups()
             source = _strip_fence(source)
             try:
                 parse_script(source, max_actions=settings.max_script_actions)
                 bot.db.save_script(ctx.author.id, name, source)
             except (ScriptError, StorageError) as exc:
-                await ctx.reply(f"Could not save script: {exc}", mention_author=False)
+                await ctx.reply(f"Could not create script: {exc}", mention_author=False)
                 return
             await ctx.reply(
-                f"Script `{name}` saved. Use !exe run {name} to execute it.",
+                f"Script `{name}` created and saved. Running and managing saved scripts will be added later.",
                 mention_author=False,
             )
-            return
-
-        if cleaned.lower() == "list":
-            names = bot.db.list_scripts(ctx.author.id)
-            response = (
-                "You have no saved scripts. Create one with !exe save name :: send(\"Hello\")."
-                if not names
-                else "Your scripts: " + ", ".join(f"`{name}`" for name in names)
-            )
-            await ctx.reply(response, mention_author=False)
-            return
-
-        name_match = _NAME_COMMAND_RE.fullmatch(cleaned)
-        if name_match:
-            operation, name = name_match.groups()
-            operation = operation.lower()
-            try:
-                if operation == "run":
-                    source = bot.db.get_script(ctx.author.id, name)
-                    if source is None:
-                        await ctx.reply(f"No saved script named `{name}` found for your account.", mention_author=False)
-                        return
-                    await run_source(ctx, source)
-                else:
-                    deleted = bot.db.delete_script(ctx.author.id, name)
-                    await ctx.reply(
-                        f"Script `{name}` deleted." if deleted else f"No saved script named `{name}` found.",
-                        mention_author=False,
-                    )
-            except StorageError as exc:
-                await ctx.reply(str(exc), mention_author=False)
             return
 
         # A plain !exe message runs the source directly.
