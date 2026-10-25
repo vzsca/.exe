@@ -371,7 +371,9 @@ def test_indented_counted_loop_supports_counter_interpolation():
         '    send(f"item {i}")'
     )
     assert expand_actions(program) == [
-        SendMessage("item 1"), SendMessage("item 2"), SendMessage("item 3")
+        SendMessage("item 1", None, True),
+        SendMessage("item 2", None, True),
+        SendMessage("item 3", None, True),
     ]
 
 
