@@ -56,6 +56,7 @@ Compact loops and conditions can now contain multiple instructions separated by 
 
 ```text
 R(2, m("Starting")§create_role("Tester", "#5865F2", "view_channel, send_messages"))
+v(mode, "safe")
 I(mode, "safe", m("Allowed")§create_category("Safe-zone"))
 ```
 
