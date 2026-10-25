@@ -14,12 +14,14 @@ Implemented:
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
 - `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
-- Owner-ID and whitelist access checks.
+- Owner-ID and SQLite-backed whitelist access checks.
+- Owner-only whitelist management: `!exe admin add @user`, `!exe admin remove @user`, and `!exe admin list`.
+- SQLite tables for custom scripts, event handlers, and whitelist entries.
 - Limits on script size, action count, message size, repeat count/depth, and execution time.
 - Script-generated messages cannot ping users or roles.
-- Automated parser tests and a GitHub Actions test workflow.
+- Automated parser and storage tests, plus a GitHub Actions test workflow.
 
-Still to build: conditionals, richer values and expressions, Discord administration actions, custom commands/events saved in SQLite, owner-only whitelist management commands, and `sudo` verification.
+Still to build: conditionals, richer values and expressions, Discord administration actions, commands for saving/running user scripts and event handlers, hot-loading stored scripts, and `sudo` verification.
 
 ## Syntax examples
 
@@ -46,7 +48,8 @@ For multiple instructions in Discord, send a fenced code block after `!exe`. Sem
 - No `eval`, `exec`, arbitrary Python, OS shell access, or unrestricted file access.
 - Scripts can only call explicitly registered language instructions/actions.
 - Owner identity is verified using `OWNER_ID`, not server Administrator permissions.
-- Whitelist access does not grant owner privileges.
+- Whitelist membership grants permission to run scripts, not owner privileges.
+- Whitelist changes are persisted in SQLite and are only available to the configured owner.
 - Secrets belong in `.env`, never in source control.
 - Script execution has configured time and action limits.
 
@@ -61,6 +64,8 @@ For multiple instructions in Discord, send a fenced code block after `!exe`. Sem
 4. Copy `.env.example` to `.env` and fill in `DISCORD_TOKEN` and `OWNER_ID`.
 5. In the Discord Developer Portal, enable **Message Content Intent** for the bot.
 6. Start it with `python -m exe_bot`.
+
+The SQLite file is created automatically at `DATABASE_PATH` (default: `data/exe.sqlite3`).
 
 Run tests with `python -m pip install -r requirements-dev.txt`, then `python -m pytest`.
 
