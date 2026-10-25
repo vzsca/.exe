@@ -20,6 +20,12 @@ class SetVariable:
 
 
 @dataclass(frozen=True, slots=True)
+class InputVariable:
+    name: str
+    question: str
+
+
+@dataclass(frozen=True, slots=True)
 class SendMessage:
     text: str
     channel: str | None = None
@@ -45,7 +51,7 @@ class IfEquals:
     else_body: tuple["Instruction", ...] = ()
 
 
-Instruction = SetVariable | SendMessage | DiscordAction | Repeat | IfEquals
+Instruction = SetVariable | InputVariable | SendMessage | DiscordAction | Repeat | IfEquals
 _NAME = r"[A-Za-z_][A-Za-z0-9_]{0,31}"
 _SET_STANDARD = re.compile(rf"^let\s+({_NAME})\s*=\s*(.+)$")
 _SET_COMPACT = re.compile(rf"^v\(\s*({_NAME})\s*,\s*(.+)\s*\)$")
@@ -164,6 +170,8 @@ def _parse_body(
         for instruction in parsed:
             if isinstance(instruction, SetVariable):
                 variables[instruction.name] = instruction.value
+            elif isinstance(instruction, InputVariable):
+                variables[instruction.name] = "__EXE_PENDING_INPUT__"
     return body
 
 def _split_arguments(source: str) -> list[str]:
@@ -241,6 +249,12 @@ def _parse_one(
     match = _SET_STANDARD.fullmatch(statement) or _SET_COMPACT.fullmatch(statement)
     if match:
         name, raw_value = match.groups()
+        input_match = re.fullmatch(r"""input\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\)""", raw_value.strip())
+        if input_match:
+            question = _parse_value(input_match.group(1), line_number, variables)
+            if not question:
+                raise ScriptError(f"Line {line_number}: input question cannot be empty")
+            return [InputVariable(name, question)]
         return [SetVariable(name, _parse_value(raw_value, line_number, variables))]
 
     match = _IF_STANDARD.fullmatch(statement) or _IF_COMPACT.fullmatch(statement)
@@ -290,7 +304,7 @@ def _parse_one(
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name):
                     if value.value.id not in variables:
                         raise ScriptError(f"Line {line_number}: unknown variable '{value.value.id}' in f-string")
-                    chunks.append(variables[value.value.id])
+                    chunks.append(f"__EXE_VAR_{value.value.id}__" if variables[value.value.id] == "__EXE_PENDING_INPUT__" else variables[value.value.id])
                 else:
                     raise ScriptError(f"Line {line_number}: f-strings only support text and defined variables")
             text_value = "".join(chunks)
@@ -447,7 +461,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     if action_budget > max_actions:
         raise ScriptError(f"Script exceeds the limit of {max_actions} actions")
 
-    if not any(not isinstance(item, SetVariable) for item in instructions):
+    if not any(not isinstance(item, (SetVariable, InputVariable)) for item in instructions):
         raise ScriptError("Script has no actions")
     return instructions
 
@@ -455,7 +469,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
 def _count_actions(instruction: Instruction) -> int:
     if isinstance(instruction, (SendMessage, DiscordAction)):
         return 1
-    if isinstance(instruction, SetVariable):
+    if isinstance(instruction, (SetVariable, InputVariable)):
         return 0
     if isinstance(instruction, IfEquals):
         # Count both branches so conditionals cannot bypass the action budget.
@@ -471,7 +485,7 @@ def expand_actions(instructions: list[Instruction]) -> list[SendMessage | Discor
 
     def expand(items: tuple[Instruction, ...] | list[Instruction]) -> None:
         for item in items:
-            if isinstance(item, (SendMessage, DiscordAction)):
+            if isinstance(item, (SendMessage, DiscordAction, InputVariable)):
                 actions.append(item)
             elif isinstance(item, Repeat):
                 for _ in range(item.count):
