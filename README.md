@@ -11,7 +11,7 @@ Both syntaxes compile into the same internal instruction types and use the same 
 
 Implemented:
 - `send("Hello")` / compact `m("Hello")` to send a message. An optional second argument targets a text channel by exact name or ID, e.g. `send("Hello", "#general")` or `send("Hello", "123456789012345678")`.
-- Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `create_role`, `delete_role`, `create_category`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
+- Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `give_role`, `remove_role`, `create_role`, `delete_role`, `create_category`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
 - Read-only server inventory in f-strings: `guilds_roles()`, `guilds_members()`, `guilds_channels()`, and `guilds_categories()`. Results include names and IDs; member results are capped at 100.
 - `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
 - `send(greeting)` / compact `m(greeting)` to use a defined variable.
@@ -97,6 +97,8 @@ unban("123456789012345678")
 kick("123456789012345678", "Spam")
 timeout("123456789012345678", 10)
 untimeout("123456789012345678")
+give_role("123456789012345678", "123456789012345678")
+remove_role("123456789012345678", "123456789012345678")
 create_role("Helpers")
 create_role("Moderators", "#5865F2", "view_channel, send_messages, manage_messages, kick_members")
 delete_role("123456789012345678")
@@ -112,7 +114,7 @@ For `create_category`, the category name is required; an optional second argumen
 
 For `create_role`, the name is required; color and permissions are optional. Use a six-digit hex color (for example `"#5865F2"`) and a comma-separated permission string (for example `"view_channel, send_messages, manage_messages"`). Supported permissions are `view_channel`, `send_messages`, `read_message_history`, `embed_links`, `attach_files`, `add_reactions`, `use_external_emojis`, `connect`, `speak`, `stream`, `use_voice_activation`, `manage_messages`, `manage_nicknames`, `kick_members`, `ban_members`, `moderate_members`, and `view_audit_log`. High-risk permissions, including `administrator`, are intentionally not supported.
 
-These actions require the matching native Discord permission from both the user running the script and the bot. Role hierarchy is checked for member moderation and role deletion. IDs or exact role/channel names are accepted for deletion; user targets should be Discord IDs. `timeout` duration is 1–40320 minutes, `slowmode` is 0–21600 seconds, and `clear` is limited to 1–100 recent messages. These functions only work in a server. Use them carefully: role/channel deletion and message clearing are destructive.
+These actions require the matching native Discord permission from both the user running the script and the bot. `give_role(member_id, role_id_or_exact_name)` assigns an existing role to a server member; `remove_role(member_id, role_id_or_exact_name)` removes it. Both require Manage Roles and check that the role is below the actor’s and bot’s highest roles. Role hierarchy is also checked for member moderation and role deletion. IDs or exact role/channel names are accepted for deletion; user targets should be Discord IDs. `timeout` duration is 1–40320 minutes, `slowmode` is 0–21600 seconds, and `clear` is limited to 1–100 recent messages. These functions only work in a server. Use them carefully: role/channel deletion and message clearing are destructive.
 
 ## Security principles
 
