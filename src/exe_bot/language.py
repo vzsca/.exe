@@ -25,6 +25,12 @@ class SendMessage:
 
 
 @dataclass(frozen=True, slots=True)
+class DiscordAction:
+    name: str
+    arguments: tuple[str | int, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Repeat:
     count: int
     body: tuple["Instruction", ...]
@@ -37,7 +43,7 @@ class IfEquals:
     else_body: tuple["Instruction", ...] = ()
 
 
-Instruction = SetVariable | SendMessage | Repeat | IfEquals
+Instruction = SetVariable | SendMessage | DiscordAction | Repeat | IfEquals
 _NAME = r"[A-Za-z_][A-Za-z0-9_]{0,31}"
 _SET_STANDARD = re.compile(rf"^let\s+({_NAME})\s*=\s*(.+)$")
 _SET_COMPACT = re.compile(rf"^v\(\s*({_NAME})\s*,\s*(.+)\s*\)$")
@@ -49,6 +55,14 @@ _IF_STANDARD = re.compile(rf"^if\s+({_NAME})\s*==\s*(.+?)\s*:\s*(.+)$")
 _IF_COMPACT = re.compile(rf"^I\(\s*({_NAME})\s*,\s*(.+?)\s*,\s*(.+)\s*\)$")
 _ELSE_STANDARD = re.compile(r"^else\s*:\s*(.+)$")
 _ELSE_COMPACT = re.compile(r"^E\(\s*(.+)\s*\)$")
+_DISCORD_ACTIONS = {
+    "ban": (2, 2), "unban": (1, 2), "kick": (1, 2),
+    "timeout": (2, 2), "untimeout": (1, 1),
+    "create_role": (1, 1), "delete_role": (1, 1),
+    "create_channel": (1, 1), "delete_channel": (1, 1),
+    "slowmode": (1, 1), "clear": (1, 1),
+}
+_ACTION_CALL = re.compile(r"^([a-z_]+)\((.*)\)$", re.IGNORECASE)
 _MAX_REPEAT = 10
 _MAX_DEPTH = 4
 
@@ -106,6 +120,69 @@ def _split_statements(source: str) -> list[tuple[int, str]]:
     return statements
 
 
+def _split_arguments(source: str) -> list[str]:
+    parts: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for char in source:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\" and quote:
+            current.append(char)
+            escaped = True
+            continue
+        if char in ("'", '"'):
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+        if char == "," and quote is None:
+            parts.append("".join(current).strip())
+            current = []
+        else:
+            current.append(char)
+    if quote:
+        raise ScriptError("Unclosed quote in function arguments")
+    if current or source.strip():
+        parts.append("".join(current).strip())
+    return parts
+
+
+def _parse_discord_action(statement: str, line_number: int, variables: dict[str, str]) -> DiscordAction | None:
+    match = _ACTION_CALL.fullmatch(statement)
+    if not match:
+        return None
+    name, raw_arguments = match.groups()
+    name = name.lower()
+    if name not in _DISCORD_ACTIONS:
+        return None
+    parts = _split_arguments(raw_arguments)
+    minimum, maximum = _DISCORD_ACTIONS[name]
+    if not minimum <= len(parts) <= maximum:
+        raise ScriptError(f"Line {line_number}: {name} expects {minimum}" +
+                          (f" to {maximum}" if maximum != minimum else "") + " argument(s)")
+    arguments: list[str | int] = []
+    for part in parts:
+        if re.fullmatch(r"\d+", part):
+            value: str | int = int(part)
+        elif re.fullmatch(_NAME, part) and part in variables:
+            value = variables[part]
+        else:
+            try:
+                value = ast.literal_eval(part)
+            except (ValueError, SyntaxError) as exc:
+                raise ScriptError(f"Line {line_number}: arguments must be quoted text, integers, or defined variables") from exc
+        if not isinstance(value, (str, int)) or isinstance(value, bool):
+            raise ScriptError(f"Line {line_number}: unsupported function argument")
+        if isinstance(value, str) and len(value) > 1800:
+            raise ScriptError(f"Line {line_number}: argument is too long")
+        arguments.append(value)
+    return DiscordAction(name, tuple(arguments))
+
+
 def _parse_one(
     statement: str,
     line_number: int,
@@ -141,6 +218,10 @@ def _parse_one(
         if not body:
             raise ScriptError(f"Line {line_number}: repeat body cannot be empty")
         return [Repeat(count, tuple(body))]
+
+    action = _parse_discord_action(statement, line_number, variables)
+    if action is not None:
+        return [action]
 
     match = _SEND_STANDARD.fullmatch(statement) or _SEND_COMPACT.fullmatch(statement)
     if match:
@@ -192,7 +273,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
 
 
 def _count_actions(instruction: Instruction) -> int:
-    if isinstance(instruction, SendMessage):
+    if isinstance(instruction, (SendMessage, DiscordAction)):
         return 1
     if isinstance(instruction, SetVariable):
         return 0
@@ -204,13 +285,13 @@ def _count_actions(instruction: Instruction) -> int:
     return instruction.count * sum(_count_actions(item) for item in instruction.body)
 
 
-def expand_actions(instructions: list[Instruction]) -> list[SendMessage]:
+def expand_actions(instructions: list[Instruction]) -> list[SendMessage | DiscordAction]:
     """Expand bounded repeats into the shared list of executable Discord actions."""
-    actions: list[SendMessage] = []
+    actions: list[SendMessage | DiscordAction] = []
 
     def expand(items: tuple[Instruction, ...] | list[Instruction]) -> None:
         for item in items:
-            if isinstance(item, SendMessage):
+            if isinstance(item, (SendMessage, DiscordAction)):
                 actions.append(item)
             elif isinstance(item, Repeat):
                 for _ in range(item.count):
