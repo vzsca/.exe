@@ -174,7 +174,8 @@ def build_bot(settings: Settings) -> ExeBot:
                 permissions=role_permissions,
                 reason=f".exe by {actor.id}",
             )
-            return f"@{created_role.name}"
+            # Return the immutable ID so duplicate role names cannot resolve to an older role.
+            return f"@{created_role.id}"
         elif name == "delete_role":
             raw = str(args[0])
             role = guild.get_role(int(raw)) if raw.isdigit() else discord.utils.get(guild.roles, name=raw)
@@ -343,7 +344,8 @@ def build_bot(settings: Settings) -> ExeBot:
                             raise ScriptError(f"Input '{action.name}' timed out while waiting for your reply.") from exc
                         if len(answer.content) > 1800:
                             raise ScriptError("Input response is too long (maximum 1800 characters).")
-                        runtime_variables[action.name] = answer.content
+                        # User input is plain text and must never trigger role pings.
+                        runtime_variables[action.name] = answer.content.replace("@", "@\u200b")
                     elif isinstance(action, SendMessage):
                         target = ctx.channel
                         if action.channel is not None:
@@ -364,12 +366,14 @@ def build_bot(settings: Settings) -> ExeBot:
                             # Match exact role names longest-first, including names with spaces.
                             for role in sorted(ctx.guild.roles, key=lambda item: len(item.name), reverse=True):
                                 token = f"@{role.name}"
-                                if token in content:
-                                    content = content.replace(token, role.mention)
+                                # Match the whole role token, never a prefix such as @Mod in @Moderator.
+                                pattern = re.compile(r"(?<![\w@])" + re.escape(token) + r"(?!\w)", re.IGNORECASE)
+                                if pattern.search(content):
+                                    content = pattern.sub(lambda _: role.mention, content)
                                     if role not in allowed_roles:
                                         allowed_roles.append(role)
-                            # Numeric role IDs are also accepted as explicit mentions.
-                            role_id_pattern = re.compile(r"@([0-9]{15,22})(?=\s|$|[,!.?:;])")
+                            # Numeric IDs are accepted as explicit role references.
+                            role_id_pattern = re.compile(r"(?<!\w)@([0-9]{15,22})(?!\d)")
                             def replace_role_id(match: re.Match[str]) -> str:
                                 role = ctx.guild.get_role(int(match.group(1)))
                                 if role is None:
