@@ -340,12 +340,12 @@ def test_created_channel_and_category_results_are_typed_and_reusable(
         (
             '@send(f"created {@create_channel("annonces")}");',
             "create_channel",
-            SendMessage("created #__EXE_VAR___exe_result_0__", channel_mentions=True),
+            SendMessage("created #__EXE_VAR___exe_result_0__", role_mentions=True, channel_mentions=True),
         ),
         (
             '@send(f"created {@create_category("Infos")}");',
             "create_category",
-            SendMessage("created __EXE_VAR___exe_result_0__"),
+            SendMessage("created __EXE_VAR___exe_result_0__", role_mentions=True),
         ),
     ],
 )
