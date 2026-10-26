@@ -15,8 +15,8 @@ def test_python_style_range_loop_expands_exclusive_stop():
 def test_range_loop_interpolates_discord_action_arguments():
     program = parse_script(
         'for i in range(1, 4) { '
-        '@create_category(f"Test-{i}"); '
-        '@create_channel(f"annonces-test-{i}", f"Test-{i}"); '
+        '@create_category("Test-{i}"); '
+        '@create_channel("annonces-test-{i}", "Test-{i}"); '
         '}'
     )
     assert program == [
