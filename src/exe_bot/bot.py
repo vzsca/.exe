@@ -310,7 +310,25 @@ def build_bot(settings: Settings) -> ExeBot:
                     guild.categories, name=raw_category
                 )
                 if not isinstance(category, discord.CategoryChannel):
-                    raise ScriptError("Category must be an existing category ID or exact name.")
+                    # A category created by the previous action may not yet be
+                    # present in the local guild cache. Refresh once before refusing.
+                    try:
+                        channels = await guild.fetch_channels()
+                        category = next(
+                            (
+                                channel for channel in channels
+                                if isinstance(channel, discord.CategoryChannel)
+                                and channel.name == raw_category
+                            ),
+                            None,
+                        )
+                    except (discord.Forbidden, discord.HTTPException):
+                        category = None
+                    if not isinstance(category, discord.CategoryChannel):
+                        raise ScriptError(
+                            "Category must be an existing category ID or exact name. "
+                            "When using a loop, ensure the generated category name matches exactly."
+                        )
 
             overwrites = {}
             if len(args) >= 3 and str(args[2]).strip():
