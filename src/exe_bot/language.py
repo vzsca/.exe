@@ -621,6 +621,7 @@ def _normalize_modern_syntax(source: str) -> str:
     depth_paren = 0
     indent = 0
     input_brace = False
+    literal_brace_depth = 0
     for char in source:
         if escaped:
             current.append(char)
@@ -650,8 +651,23 @@ def _normalize_modern_syntax(source: str) -> str:
                 current.append(char)
                 input_brace = False
                 continue
+            if depth_paren == 0 and char == "{" and literal_brace_depth:
+                literal_brace_depth += 1
+                current.append(char)
+                continue
+            if depth_paren == 0 and char == "}" and literal_brace_depth:
+                literal_brace_depth -= 1
+                current.append(char)
+                continue
             if depth_paren == 0 and char == "{":
                 header = "".join(current).strip()
+                is_block_header = bool(
+                    re.match(r"^(?:if|elif|else|repeat|for)\b", header)
+                )
+                if not is_block_header:
+                    current.append(char)
+                    literal_brace_depth = 1
+                    continue
                 current = []
                 if not header:
                     raise ScriptError("Unexpected opening brace")
