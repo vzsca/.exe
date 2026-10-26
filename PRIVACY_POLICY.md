@@ -1,32 +1,39 @@
-# Politique de confidentialité de .exe
+# .exe Privacy Policy Template
 
-Dernière mise à jour : 25 octobre 2026
+Last updated: October 25, 2026
 
-## 1. Périmètre et responsable
-.exe est un logiciel open source qui s’exécute sur l’infrastructure de la personne qui l’installe. Le responsable du traitement dépend donc de l’exploitant de chaque instance. Cette page décrit le comportement prévu par le dépôt ; l’exploitant doit la vérifier avant de publier ou d’héberger le bot.
+## 1. Scope and controller
 
-## 2. Données traitées par le logiciel
-Selon les commandes utilisées, le bot peut traiter :
-- les identifiants Discord de l’auteur d’une commande et des cibles d’actions de modération ;
-- les identifiants de serveur, salon et rôles nécessaires à l’exécution des commandes ;
-- le contenu des commandes et scripts, ainsi que les réponses fournies à la fonction `input()` ;
-- les scripts nommés sauvegardés, associés à l’identifiant Discord de leur créateur ;
-- les identifiants inscrits dans la liste blanche ;
-- des informations techniques et erreurs écrites dans les journaux par l’application.
+.exe is open-source software run on the infrastructure of whoever installs it. The data controller therefore depends on the operator of each instance. This document describes the behavior intended by this repository; operators must verify it against the exact version and configuration they deploy.
 
-Les scripts enregistrés et la liste blanche sont stockés dans la base SQLite configurée par l’exploitant. Les journaux peuvent contenir des métadonnées d’exécution et des identifiants. L’exploitant doit vérifier le code et la configuration de sa version pour confirmer exactement les données conservées.
+## 2. Data the software may process
 
-## 3. Finalités et base de traitement
-Ces données servent à exécuter les commandes, appliquer les autorisations, sauvegarder les scripts demandés, gérer la liste blanche, diagnostiquer les erreurs et protéger le bot contre les usages non autorisés. Pour une instance utilisée dans un cadre soumis au RGPD, l’exploitant doit déterminer et documenter la base légale applicable.
+Depending on the commands and scripts used, the bot may process:
+- Discord user IDs for command authors and moderation targets;
+- server, channel, and role IDs needed to execute commands;
+- command and script content, including replies submitted to .exe input declarations;
+- named scripts saved by users, associated with their Discord user ID;
+- user IDs stored in the execution whitelist;
+- technical information and errors written to application logs.
 
-## 4. Destinataires et services tiers
-Les commandes sont traitées par le bot hébergé par l’exploitant et transmises à Discord via son API. Discord traite ces données conformément à ses propres conditions et à sa politique de confidentialité. L’accès à la base SQLite et aux journaux doit être limité à l’exploitant et aux personnes autorisées.
+Saved scripts and whitelist entries are stored in the operator-configured SQLite database. Logs may include execution metadata and IDs. Operators should inspect the code and configuration of their deployed version to confirm exactly what is retained.
 
-## 5. Conservation et sécurité
-La durée de conservation dépend de la configuration et des pratiques de l’exploitant. Les scripts et entrées de liste blanche peuvent être supprimés via les fonctionnalités disponibles ou directement dans la base de données. Protégez le fichier SQLite, les journaux, les sauvegardes et le fichier `.env`; ne publiez jamais le jeton du bot. Ne stockez pas de données sensibles dans les scripts ou leurs entrées.
+## 3. Purposes and legal basis
 
-## 6. Droits et contact
-Les demandes d’accès, de rectification ou de suppression doivent être adressées à l’exploitant de l’instance, qui doit répondre selon la législation applicable. Pour le dépôt logiciel, signalez les questions ou corrections via https://github.com/vzsca/.exe/issues.
+This data is used to execute commands, enforce access control, save requested scripts, manage the whitelist, diagnose errors, and protect the bot against unauthorized use. Where an instance is subject to GDPR, the operator must determine and document the applicable legal basis.
 
-## 7. Limites de ce document
-Cette politique est un modèle de départ et ne garantit pas à elle seule la conformité au RGPD. Avant toute mise en service, l’exploitant doit confirmer les traitements réels, ajouter ses coordonnées, préciser les durées de conservation, les éventuels transferts et les modalités d’exercice des droits.
+## 4. Recipients and third-party services
+
+Commands are handled by the bot hosted by the operator and sent to Discord through its API. Discord processes data under its own terms and privacy policy. Access to the SQLite database and logs should be limited to the operator and authorized people.
+
+## 5. Retention and security
+
+Retention periods depend on the operator's configuration and practices. Scripts and whitelist entries can be deleted using available features or directly from the database. Protect the SQLite file, logs, backups, and .env file. Never publish the bot token, and do not store sensitive data in scripts or their inputs.
+
+## 6. Rights and contact
+
+Requests to access, correct, or delete data should be sent to the operator of the relevant instance, who must respond under applicable law. For issues or corrections related to the software repository, use https://github.com/vzsca/.exe/issues.
+
+## 7. Limitations
+
+This policy is a starting template and does not by itself guarantee GDPR compliance. Before deploying the bot, operators should confirm actual processing, add their contact details, define retention periods, disclose any transfers, and explain how data-subject rights can be exercised.
