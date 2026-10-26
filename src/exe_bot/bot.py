@@ -10,13 +10,13 @@ import discord
 from discord.ext import commands
 
 from .config import Settings
-from .language import DiscordAction, InputVariable, ScriptError, SendMessage, expand_actions, parse_script
+from .language import DiscordAction, IfEquals, InputVariable, Instruction, ScriptError, SendMessage, expand_actions, parse_script
 from .permissions import is_owner, may_run_scripts
 from .storage import Database, StorageError
 
 log = logging.getLogger(__name__)
 
-HELP_TEXT = "\\n".join([
+HELP_TEXT = "\n".join([
     'Modern .exe syntax: var greeting.str = "Hello"; @send(greeting);',
     'Every instruction ends with a semicolon. Newlines are optional after semicolons.',
     'Blocks use braces: if (mode == "safe") { @send("allowed"); }',
@@ -48,7 +48,7 @@ class ExeBot(commands.Bot):
     def __init__(self, settings: Settings) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
-        intents.members = True
+        intents.members = settings.enable_members_intent
         super().__init__(command_prefix="!", intents=intents, help_command=None)
         self.settings = settings
         self.db = Database(settings.database_path)
@@ -415,15 +415,30 @@ def build_bot(settings: Settings) -> ExeBot:
         log.info(".exe script parsed: %d actions (channel=%s actor=%s timeout=%ss)",
                  len(actions), ctx.channel.id, ctx.author.id, settings.script_timeout_seconds)
 
-        async def execute_actions() -> None:
-            for index, action in enumerate(actions, start=1):
-                action_name = "input" if isinstance(action, InputVariable) else ("send" if isinstance(action, SendMessage) else action.name)
+        async def execute_actions(action_list: list[Instruction] = actions) -> None:
+            for index, action in enumerate(action_list, start=1):
+                action_name = (
+                    "input" if isinstance(action, InputVariable)
+                    else "send" if isinstance(action, SendMessage)
+                    else "if" if isinstance(action, IfEquals)
+                    else action.name
+                )
                 current_action.update(index=index, name=action_name)
                 started = time.monotonic()
                 log.info(".exe action %d/%d starting: %s (channel=%s actor=%s)",
                          index, len(actions), action_name, ctx.channel.id, ctx.author.id)
                 try:
-                    if isinstance(action, InputVariable):
+                    if isinstance(action, IfEquals):
+                        if action.variable_name is None:
+                            raise ScriptError("Invalid deferred condition: missing variable name.")
+                        if action.variable_name in runtime_variables:
+                            runtime_value = runtime_variables[action.variable_name]
+                            matched = isinstance(action.expected, str) and runtime_value == action.expected
+                        else:
+                            matched = bool(action.matched)
+                        branch = action.body if matched else action.else_body
+                        await execute_actions(expand_actions(list(branch)))
+                    elif isinstance(action, InputVariable):
                         await ctx.channel.send(action.question)
                         def check(message: discord.Message) -> bool:
                             return message.author.id == ctx.author.id and message.channel.id == ctx.channel.id and not message.author.bot
