@@ -2,6 +2,11 @@
 
 .exe is a Python Discord bot with a small, allowlisted scripting language for sending messages and performing server-management actions. **It is not Python**: scripts cannot execute arbitrary Python code.
 
+## 🌐 Official Discord servers
+
+- [0x00.exe | Official Server](https://discord.gg/XCWKSnFMcU) — community, support, and development for `.exe`.
+- [Noscape | Official Group](https://discord.gg/7VvdbZn224) — the collective behind `.exe` and its other projects.
+
 ## Features
 
 - Typed variables, safe expressions, dictionaries, bounded loops, and if/else blocks.
