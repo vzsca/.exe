@@ -25,6 +25,7 @@ class SetVariable:
 class InputVariable:
     name: str
     question: str
+    type_name: str = "str"
 
 
 @dataclass(frozen=True, slots=True)
@@ -728,6 +729,45 @@ def _value_matches_type(value: object, type_name: str) -> bool:
     if type_name == "time":
         return isinstance(value, (int, float, str)) and not isinstance(value, bool)
     return False
+
+
+def parse_input_value(raw_value: str, type_name: str) -> object:
+    """Parse and validate plain-text Discord input according to its declared type."""
+    value = raw_value.strip()
+    try:
+        if type_name == "str":
+            parsed: object = raw_value
+        elif type_name == "int":
+            if not re.fullmatch(r"[+-]?\d+", value):
+                raise ValueError("enter a whole number")
+            parsed = int(value)
+        elif type_name == "float":
+            parsed = float(value)
+            if not (parsed == parsed and abs(parsed) != float("inf")):
+                raise ValueError("enter a finite number")
+        elif type_name == "bool":
+            lowered = value.casefold()
+            if lowered in {"true", "vrai", "yes", "oui", "1"}:
+                parsed = True
+            elif lowered in {"false", "faux", "no", "non", "0"}:
+                parsed = False
+            else:
+                raise ValueError("enter true/false (or oui/non)")
+        elif type_name.endswith(".id"):
+            if value.casefold() in {"none", "null"}:
+                parsed = None
+            elif re.fullmatch(r"<@!?\d+>|<@&\d+>|\d+", value):
+                parsed = int(re.sub(r"\D", "", value))
+            else:
+                raise ValueError("enter a Discord ID or a valid mention")
+        else:
+            raise ValueError(f"input type '{type_name}' is not supported")
+    except (ValueError, OverflowError) as exc:
+        raise ScriptError(f"Input does not match declared type '{type_name}': {exc}") from exc
+    if not _value_matches_type(parsed, type_name):
+        raise ScriptError(f"Input does not match declared type '{type_name}'")
+    return parsed
+
 _NATIVE_ALIASES = {
     "mute": "timeout",
     "unmute": "untimeout",
@@ -1014,6 +1054,23 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
         declared_types[declaration.group(1)] = declaration.group(2)
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
+    def apply_declared_input_types(instruction: Instruction) -> Instruction:
+        if isinstance(instruction, InputVariable):
+            return InputVariable(
+                instruction.name,
+                instruction.question,
+                declared_types.get(instruction.name, "str"),
+            )
+        if isinstance(instruction, Repeat):
+            return Repeat(instruction.count, tuple(apply_declared_input_types(item) for item in instruction.body))
+        if isinstance(instruction, IfEquals):
+            return IfEquals(
+                instruction.matched,
+                tuple(apply_declared_input_types(item) for item in instruction.body),
+                tuple(apply_declared_input_types(item) for item in instruction.else_body),
+            )
+        return instruction
+
     def validate_declared_types(instruction: Instruction, line_number: int) -> None:
         if isinstance(instruction, SetVariable) and instruction.name in declared_types:
             declared_type = declared_types[instruction.name]
@@ -1022,6 +1079,9 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
                     f"Line {line_number}: value assigned to '{instruction.name}' "
                     f"does not match declared type '{declared_type}'"
                 )
+        elif isinstance(instruction, InputVariable):
+            if instruction.type_name not in _TYPE_NAMES or instruction.type_name in {"list", "dict", "time"}:
+                raise ScriptError(f"Input type '{instruction.type_name}' is not supported")
         elif isinstance(instruction, Repeat):
             for nested in instruction.body:
                 validate_declared_types(nested, line_number)
@@ -1043,6 +1103,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
 
         parsed = _parse_one(statement, line_number, variables, 0)
         for instruction in parsed:
+            instruction = apply_declared_input_types(instruction)
             validate_declared_types(instruction, line_number)
             instructions.append(instruction)
             if isinstance(instruction, SetVariable):
