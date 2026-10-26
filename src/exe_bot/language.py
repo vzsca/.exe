@@ -836,11 +836,38 @@ def _normalize_modern_syntax(source: str) -> str:
     return "\n".join(normalized)
 
 
+def _validate_modern_surface_syntax(source: str) -> None:
+    """Reject legacy spellings and require semicolons after executable statements."""
+    legacy_patterns = (
+        (r"(?m)^\s*let\s+", "Legacy let declarations are not supported; use var name.type = value;"),
+        (r"(?m)^\s*v\s*\(", "Compact syntax v(...) is not supported."),
+        (r"(?m)^\s*m\s*\(", "Compact syntax m(...) is not supported."),
+        (r"(?m)^\s*R\s*\(", "Compact syntax R(...) is not supported."),
+        (r"(?m)^\s*I\s*\(", "Compact syntax I(...) is not supported."),
+        (r"(?m)^\s*E\s*\(", "Compact syntax E(...) is not supported."),
+        (r"(?m)^\s*send\s*\(", "Native functions must start with @, for example @send(...);"),
+    )
+    for pattern, message in legacy_patterns:
+        if re.search(pattern, source):
+            raise ScriptError(message)
+    for line_number, line in enumerate(source.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.endswith("{") or stripped == "}":
+            continue
+        if stripped.endswith(";") or stripped.startswith("}"):
+            continue
+        if "}" in stripped:
+            tail = stripped.rsplit("}", 1)[1].strip()
+            if not tail or tail.endswith(";"):
+                continue
+        raise ScriptError(f"Line {line_number}: every instruction must end with ';'")
+
+
 def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
-    """Parse standard and compact syntax to shared, validated instructions."""
+    """Parse modern brace-based syntax with mandatory statement semicolons."""
     if len(source) > 8000:
         raise ScriptError("Script is too long (maximum 8000 characters)")
-
+    _validate_modern_surface_syntax(source)
     source = _normalize_modern_syntax(source)
     source = _normalize_indented_blocks(source)
     statements = _split_statements(source)
