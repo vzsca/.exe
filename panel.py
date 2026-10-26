@@ -126,7 +126,7 @@ def uptime() -> None:
     days, rem = divmod(seconds, 86400)
     hours, rem = divmod(rem, 3600)
     minutes, secs = divmod(rem, 60)
-    print(f"Uptime : {days}j {hours}h {minutes}min {secs}s (PID {proc.pid}).")
+    print(f"Uptime: {days}d {hours}h {minutes}m {secs}s (PID {proc.pid}).")
 
 
 def status() -> None:
@@ -165,7 +165,7 @@ def show_help() -> None:
   set_token   Configure the Discord token (hidden input)
   set_owner   Configure the owner's Discord ID
   logs        Show the last 30 lines of bot.log
-  help        Afficher cette aide
+  help        Show this help
   exit        Close the panel (the bot keeps running)
 """)
 
