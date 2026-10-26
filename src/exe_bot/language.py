@@ -620,6 +620,7 @@ def _normalize_modern_syntax(source: str) -> str:
     escaped = False
     depth_paren = 0
     indent = 0
+    input_brace = False
     for char in source:
         if escaped:
             current.append(char)
@@ -641,6 +642,14 @@ def _normalize_modern_syntax(source: str) -> str:
                 depth_paren += 1
             elif char == ")":
                 depth_paren = max(0, depth_paren - 1)
+            if depth_paren == 0 and char == "{" and "".join(current).strip().endswith(".input"):
+                current.append(char)
+                input_brace = True
+                continue
+            if depth_paren == 0 and char == "}" and input_brace:
+                current.append(char)
+                input_brace = False
+                continue
             if depth_paren == 0 and char == "{":
                 header = "".join(current).strip()
                 current = []
