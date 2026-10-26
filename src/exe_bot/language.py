@@ -593,11 +593,135 @@ def _normalize_indented_blocks(source: str) -> str:
     return "\n".join(output)
 
 
+
+_TYPE_NAMES = ("user.id", "channel.id", "category.id", "role.id", "message.id", "str", "int", "float", "bool", "list", "dict", "time")
+_NATIVE_ALIASES = {
+    "mute": "timeout",
+    "unmute": "untimeout",
+    "add_role": "give_role",
+    "remove_role": "remove_role",
+    "create_chanel": "create_channel",
+    "delete_chanel": "delete_channel",
+    "set_chanel": "set_channel",
+}
+
+
+def _normalize_modern_syntax(source: str) -> str:
+    """Translate the agreed English, brace-based surface syntax to the legacy AST parser.
+
+    This is a compatibility layer, not Python evaluation. Expressions and function names
+    are still validated by the existing allowlist after normalization.
+    """
+    # First scan the source to turn top-level semicolons and braces into statement
+    # boundaries while leaving quoted strings (including f-strings) untouched.
+    lines: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    depth_paren = 0
+    indent = 0
+    for char in source:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\" and quote:
+            current.append(char)
+            escaped = True
+            continue
+        if char in ("'", '"'):
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+            current.append(char)
+            continue
+        if quote is None:
+            if char == "(":
+                depth_paren += 1
+            elif char == ")":
+                depth_paren = max(0, depth_paren - 1)
+            if depth_paren == 0 and char == "{":
+                header = "".join(current).strip()
+                current = []
+                if not header:
+                    raise ScriptError("Unexpected opening brace")
+                header = re.sub(r"^if\s*\((.*)\)\s*$", r"if \1", header)
+                header = re.sub(r"^elif\s*\((.*)\)\s*$", r"elif \1", header)
+                header = re.sub(r"^else\s*$", "else", header)
+                header = re.sub(r"^repeat\s*\((.*)\)\s*$", r"repeat \1", header)
+                header = re.sub(r"^for\s+(.+?)\s+in\s+(.+?)\s*$", r"for \1 in \2", header)
+                lines.append("    " * indent + header + ":")
+                indent += 1
+                continue
+            if depth_paren == 0 and char == "}":
+                part = "".join(current).strip()
+                if part:
+                    lines.append("    " * indent + part)
+                    current = []
+                if indent == 0:
+                    raise ScriptError("Unexpected closing brace")
+                indent -= 1
+                continue
+            if depth_paren == 0 and char == ";":
+                part = "".join(current).strip()
+                if part:
+                    lines.append("    " * indent + part)
+                current = []
+                continue
+            if char == "\n":
+                part = "".join(current).strip()
+                if part:
+                    lines.append("    " * indent + part)
+                current = []
+                continue
+        current.append(char)
+    part = "".join(current).strip()
+    if part:
+        lines.append("    " * indent + part)
+    if indent:
+        raise ScriptError("Unclosed block brace")
+
+    normalized: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        # Typed declarations become the existing variable instruction form.
+        decl = re.fullmatch(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=\s*(.+)", stripped)
+        if decl:
+            name, type_name, value = decl.groups()
+            if type_name not in _TYPE_NAMES:
+                raise ScriptError(f"Unknown variable type '{type_name}'")
+            stripped = f"let {name} = {value}"
+        else:
+            input_decl = re.fullmatch(
+                r'var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,\s*("(?:[^"\\]|\\.)*"|\\'(?:[^\\'\\\\]|\\\\.)*\\')\}\s*=\s*(.+)',
+                stripped,
+            )
+            if input_decl:
+                name, type_name, question, _initial = input_decl.groups()
+                if type_name not in _TYPE_NAMES or type_name in {"list", "dict", "time"}:
+                    raise ScriptError(f"Unsupported input type '{type_name}'")
+                stripped = f"let {name} = input({question})"
+            else:
+                assign = re.fullmatch(r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)", stripped)
+                if assign:
+                    stripped = f"let {assign.group(1)} = {assign.group(2)}"
+
+        # Native calls require @ in the new syntax; the runtime registry remains allowlisted.
+        stripped = re.sub(r"(?<![\w@])@([A-Za-z_][A-Za-z0-9_]*)\s*\(", r"\1(", stripped)
+        for old_name, new_name in _NATIVE_ALIASES.items():
+            stripped = re.sub(rf"\b{re.escape(old_name)}\s*\(", f"{new_name}(", stripped)
+        # The legacy engine uses timeout(minutes) for mute(duration).
+        normalized.append(" " * (len(line) - len(line.lstrip())) + stripped)
+    return "\n".join(normalized)
+
+
 def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     """Parse standard and compact syntax to shared, validated instructions."""
     if len(source) > 8000:
         raise ScriptError("Script is too long (maximum 8000 characters)")
 
+    source = _normalize_modern_syntax(source)
     source = _normalize_indented_blocks(source)
     statements = _split_statements(source)
     if not statements:
