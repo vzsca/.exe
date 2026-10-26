@@ -68,7 +68,7 @@ def test_none_is_accepted_for_unset_typed_discord_ids():
 
 def test_misspelled_channel_function_is_not_a_supported_alias():
     with pytest.raises(ScriptError, match="unknown instruction"):
-        parse_script('@create_chanel("general")')
+        parse_script('@create_chanel("general");')
 
 def test_arithmetic_expressions_and_set_updates_are_supported():
     program = parse_script(
@@ -79,7 +79,7 @@ def test_arithmetic_expressions_and_set_updates_are_supported():
 
 def test_safe_expression_rejects_function_calls():
     with pytest.raises(ScriptError, match="invalid or unsupported expression"):
-        parse_script('var value.int = __import__("os").system("whoami"); @send("x")')
+        parse_script('var value.int = __import__("os").system("whoami"); @send("x");')
 
 
 def test_boolean_and_none_literals_are_preserved():
