@@ -1342,6 +1342,20 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
             continue
 
         parsed = _parse_one(statement, line_number, variables, 0)
+        role_id_names = {
+            name for name, type_name in declared_types.items() if type_name == "role.id"
+        }
+        parsed = [
+            SendMessage(
+                instruction.text,
+                instruction.channel,
+                True,
+            )
+            if isinstance(instruction, SendMessage)
+            and any(f"__EXE_VAR_{name}__" in instruction.text for name in role_id_names)
+            else instruction
+            for instruction in parsed
+        ]
         for instruction in parsed:
             validate_declared_types(instruction, line_number)
             instructions.append(instruction)
