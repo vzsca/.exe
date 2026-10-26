@@ -175,3 +175,12 @@ def test_create_role_result_can_be_assigned_and_reused():
 def test_create_role_result_assignment_requires_declared_variable():
     with pytest.raises(ScriptError, match="declare 'helper_role'"):
         parse_script('set helper_role = @create_role("Helpers"); @send("done");')
+
+
+def test_create_role_result_requires_role_id_type():
+    with pytest.raises(ScriptError, match="declared as 'role.id'"):
+        parse_script(
+            'var helper_role.str = ""; '
+            'set helper_role = @create_role("Helpers"); '
+            '@send("done");'
+        )
