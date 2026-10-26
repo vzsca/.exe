@@ -17,16 +17,17 @@ from .storage import Database, StorageError
 log = logging.getLogger(__name__)
 
 HELP_TEXT = (
-    'Modern syntax: !exe var greeting.str = "Hello"; @send(greeting)\\n'
+    'Modern .exe syntax: var greeting.str = "Hello"; @send(greeting);\\n'
+    'Every instruction ends with a semicolon. Newlines are optional after semicolons.\\n'
     'Blocks use braces: if (mode == "safe") { @send("allowed"); }\\n'
     'Repeat: repeat(3) { @send("again"); } or for i in range(0, 5) { @send(f"{i}"); }\\n'
-    'Variables: var count.int = 3; set count = 4\\n'
-    'Input: var username.input{str, "What is your username?"} = ""\\n'
-    'Actions: @ban(user_id, "reason"), @kick(user_id, "reason"), @unban(user_id), @mute(user_id, 10), @unmute(user_id)\\n'
-    'Roles: @create_role("name"), @add_role(user_id, role), @remove_role(user_id, role), @delete_role(id_or_exact_name)\\n'
-    'Channels: @create_channel("name"), @delete_channel(id_or_exact_name), @slowmode(seconds), @clear(count)\\n'
-    'Messages: @send("message"), @send("message", "#channel"), @dm(user_id, "message")\\n'
-    'Legacy let/send syntax remains accepted for compatibility. Only whitelisted users may run scripts; Discord permissions and role hierarchy still apply.\\n'
+    'Variables: var count.int = 3; set count = 4;\\n'
+    'Input: var username.input{str, "What is your username?"} = "";\\n'
+    'Moderation: @ban(user_id, "reason"); @kick(user_id, "reason"); @unban(user_id); @mute(user_id, 10); @unmute(user_id);\\n'
+    'Roles: @create_role("name"); @add_role(user_id, role); @remove_role(user_id, role); @delete_role(id_or_exact_name);\\n'
+    'Channels: @create_channel("name"); @delete_channel(id_or_exact_name); @slowmode(seconds); @clear(count);\\n'
+    'Messages: @send("message"); @send("message", "#channel"); @dm(user_id, "message");\\n'
+    'Compact syntax and native calls without @ are not supported. Only whitelisted users may run scripts; Discord permissions and role hierarchy still apply.\\n'
     'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.'
 )
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
@@ -625,7 +626,7 @@ def build_bot(settings: Settings) -> ExeBot:
         if cleaned.lower() == "list":
             names = bot.db.list_scripts(ctx.author.id)
             if not names:
-                response = 'You have no saved scripts. Create one with !exe create hello :: send("Hello").'
+                response = 'You have no saved scripts. Create one with !exe create hello :: @send("Hello");.'
             else:
                 visible = names[:50]
                 response = "Your saved scripts: " + ", ".join(f"`{name}`" for name in visible)
