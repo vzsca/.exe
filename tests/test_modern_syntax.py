@@ -129,3 +129,21 @@ def test_declared_integer_type_rejects_text():
 def test_declared_boolean_type_rejects_integer():
     with pytest.raises(ScriptError, match="does not match declared type"):
         parse_script('var enabled.bool = 1; @send("x");')
+
+
+def test_reassignment_must_match_declared_type():
+    with pytest.raises(ScriptError, match="does not match declared type"):
+        parse_script('var count.int = 1; set count = "two"; @send("x");')
+
+
+def test_reassignment_type_is_checked_inside_if_block():
+    with pytest.raises(ScriptError, match="does not match declared type"):
+        parse_script(
+            'var count.int = 1; var enabled.bool = True; '
+            'if (enabled == True) { set count = "two"; } @send("x");'
+        )
+
+
+def test_integer_value_is_allowed_for_float_variable():
+    program = parse_script('var ratio.float = 2; @send(f"{ratio}");')
+    assert expand_actions(program) == [SendMessage("2")]
