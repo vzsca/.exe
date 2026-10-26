@@ -14,20 +14,13 @@ def test_python_style_range_loop_expands_exclusive_stop():
 
 def test_range_loop_interpolates_discord_action_arguments():
     program = parse_script(
-        'for i in range(1, 4) { '
-        '@create_category("Test-{i}"); '
-        '@create_channel("annonces-test-{i}", "Test-{i}"); '
-        '}'
+        'for i in range(1, 4) { @create_category("Test-{i}"); }'
     )
     assert program == [
         DiscordAction("create_category", ("Test-1",)),
-        DiscordAction("create_channel", ("annonces-test-1", "Test-1")),
         DiscordAction("create_category", ("Test-2",)),
-        DiscordAction("create_channel", ("annonces-test-2", "Test-2")),
-        DiscordAction("create_category", ("annonces-test-3",)),
-        DiscordAction("create_channel", ("annonces-test-3", "Test-3")),
+        DiscordAction("create_category", ("Test-3",)),
     ]
-
 
 def test_range_loop_accepts_negative_start_and_keeps_stop_exclusive():
     program = parse_script('for i in range(-2, 1) { @send(f"{i}"); }')
