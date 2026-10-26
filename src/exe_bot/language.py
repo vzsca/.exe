@@ -507,9 +507,10 @@ def _parse_one(
         if not 1 <= len(parts) <= 2:
             raise ScriptError(f"Line {line_number}: send expects message text and an optional channel")
         raw_text = parts[0].strip()
-        role_mentions = (raw_text.startswith('f"') or raw_text.startswith("f'")) and "@" in raw_text
+        is_f_string = raw_text.startswith('f"') or raw_text.startswith("f'")
+        role_mentions = is_f_string and "@" in raw_text
         deferred_actions: list[DiscordAction] = []
-        if role_mentions:
+        if is_f_string:
             try:
                 parsed = ast.parse(raw_text, mode="eval").body
             except SyntaxError as exc:
