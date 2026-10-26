@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 from .config import Settings
-from .language import DiscordAction, InputVariable, ScriptError, SendMessage, expand_actions, parse_script
+from .language import DiscordAction, InputVariable, ScriptError, SendMessage, expand_actions, parse_input_value, parse_script
 from .permissions import is_owner, may_run_scripts
 from .storage import Database, StorageError
 
@@ -408,7 +408,7 @@ def build_bot(settings: Settings) -> ExeBot:
             return False
 
         current_action = {"index": 0, "name": "not started"}
-        runtime_variables: dict[str, str] = {}
+        runtime_variables: dict[str, object] = {}
         log.info(".exe script parsed: %d actions (channel=%s actor=%s timeout=%ss)",
                  len(actions), ctx.channel.id, ctx.author.id, settings.script_timeout_seconds)
 
@@ -430,8 +430,12 @@ def build_bot(settings: Settings) -> ExeBot:
                             raise ScriptError(f"Input '{action.name}' timed out while waiting for your reply.") from exc
                         if len(answer.content) > 1800:
                             raise ScriptError("Input response is too long (maximum 1800 characters).")
-                        # User input is plain text and must never trigger role pings.
-                        runtime_variables[action.name] = answer.content.replace("@", "@\u200b")
+                        # Parse and validate according to the declaration before using input.
+                        parsed_answer = parse_input_value(answer.content, action.type_name)
+                        # Text input is plain text and must never trigger role pings.
+                        if isinstance(parsed_answer, str):
+                            parsed_answer = parsed_answer.replace("@", "@\u200b")
+                        runtime_variables[action.name] = parsed_answer
                     elif isinstance(action, SendMessage):
                         target = ctx.channel
                         if action.channel is not None:
@@ -444,7 +448,7 @@ def build_bot(settings: Settings) -> ExeBot:
                                 raise ScriptError("Could not find the target text channel by ID or exact name.")
                         content = action.text
                         for variable_name, variable_value in runtime_variables.items():
-                            content = content.replace(f"__EXE_VAR_{variable_name}__", variable_value)
+                            content = content.replace(f"__EXE_VAR_{variable_name}__", str(variable_value))
                         allowed_roles = []
                         if action.role_mentions:
                             if ctx.guild is None:
@@ -480,7 +484,7 @@ def build_bot(settings: Settings) -> ExeBot:
                             for argument in action.arguments:
                                 if isinstance(argument, str):
                                     for variable_name, variable_value in runtime_variables.items():
-                                        argument = argument.replace(f"__EXE_VAR_{variable_name}__", variable_value)
+                                        argument = argument.replace(f"__EXE_VAR_{variable_name}__", str(variable_value))
                                 resolved_arguments.append(argument)
                             action = DiscordAction(action.name, tuple(resolved_arguments), action.result_variable)
                             action_result = await execute_discord_action(ctx, action)
