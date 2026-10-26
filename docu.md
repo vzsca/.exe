@@ -2,10 +2,14 @@
 
 Langage de scripts personnalisé pour automatiser des actions sur Discord avec le bot. Ce n'est pas Python : seuls les éléments documentés ici sont disponibles.
 
+## Conventions internationales
+
+La syntaxe du langage utilise des noms anglais : `member`, `channel`, `category`, `role`, `message`, ainsi que des fonctions comme `create_channel`, `delete_channel`, `set_channel` et `add_role`. Les textes affichés par les scripts peuvent être dans la langue choisie par leur auteur. Les identifiants de langage restent anglais pour assurer une syntaxe stable entre les traductions de la documentation.
+
 ## Principes et sécurité
 
-- Seuls les utilisateurs dont l'identifiant Discord est dans la whitelist peuvent lancer un script.
-- Aucun Python arbitraire : pas de `eval`, pas de `exec`, pas de fonctions définies par l'utilisateur et pas d'accès libre aux modules.
+- Seuls les users dont l'identifiant Discord est dans la whitelist peuvent lancer un script.
+- Aucun Python arbitraire : pas de `eval`, pas de `exec`, pas de fonctions définies par l'user et pas d'accès libre aux modules.
 - Les fonctions natives sont explicitement autorisées par le bot.
 - Les permissions Discord et la hiérarchie des rôles restent obligatoires : la whitelist ne les contourne pas.
 - Le script est analysé et vérifié avant l'exécution. Des erreurs Discord peuvent cependant survenir au moment d'exécuter une action.
@@ -30,26 +34,26 @@ Chaque variable doit déclarer son type :
 | `int` | Entier |
 | `float` | Décimal |
 | `bool` | `True` ou `False` |
-| `user.id` | Identifiant utilisateur |
-| `chanel.id` | Identifiant de salon |
-| `categorie.id` | Identifiant de catégorie |
+| `user.id` | Identifiant user |
+| `channel.id` | Identifiant de channel |
+| `category.id` | Identifiant de category |
 | `role.id` | Identifiant de rôle |
 | `message.id` | Identifiant de message |
 | `list` | Liste |
 | `dict` | Dictionnaire |
 | `time` | Durée |
 
-Les noms `chanel` et `categorie` sont volontairement orthographiés ainsi dans le langage.
+Convention internationale : les mots-clés, noms de types, collections, propriétés et fonctions du langage utilisent l'anglais. Les noms français ne sont utilisés que dans les explications de cette documentation ou dans les textes écrits par l'auteur du script.
 
 ```text
-var pseudo.str = "Alex"
-var essais.int = 3
+var username.str = "Alex"
+var attempts.int = 3
 var ratio.float = 1.5
-var actif.bool = True
-var cible.user.id = ""
-var salons.list = ()
+var enabled.bool = True
+var target.user.id = ""
+var channels.list = ()
 var configuration.dict = []
-var attente.time = 10
+var wait.time = 10
 set essais = 4
 ```
 
@@ -59,7 +63,7 @@ set essais = 4
 
 Arithmétique : `+`, `-`, `*`, `/`, `%`.
 
-Comparaison : `==`, `!=`, `<`, `>`, `<=`, `>=`. Les types comparés doivent être compatibles.
+Compareason : `==`, `!=`, `<`, `>`, `<=`, `>=`. Les types comparés doivent être compatibles.
 
 Logique : `&&` signifie ET, `!!` signifie OU et `#` signifie NON. Les parenthèses regroupent les expressions. Les priorités suivent les règles usuelles des expressions.
 
@@ -67,11 +71,11 @@ Logique : `&&` signifie ET, `!!` signifie OU et `#` signifie NON. Les parenthès
 
 ```text
 if (essais >= 3 && actif == True) {
-    @send("Conditions remplies");
+    @send("Conditions met");
 } elif (essais > 0) {
-    @send("Encore des essais");
+    @send("More attempts");
 } else {
-    @send("Aucun essai restant");
+    @send("No attempts remaining");
 }
 ```
 
@@ -81,11 +85,11 @@ if (essais >= 3 && actif == True) {
 
 ```text
 repeat(3) {
-    @send("Répétition");
+    @send("Repeat");
 }
 
-for membre in guild.user {
-    @send(membre.name);
+for member in guild.user {
+    @send(member.name);
 }
 
 for i in range(0, 5) {
@@ -98,10 +102,10 @@ for i in range(0, 5) {
 ## Chaînes formatées
 
 ```text
-var pseudo.str = "Alex"
+var username.str = "Alex"
 var score.int = 12
-@send(f"Joueur : {pseudo}, score : {score}");
-@send(f"Prochain score : {score + 1}");
+@send(f"Player: {pseudo}, score: {score}");
+@send(f"Prochain score: {score + 1}");
 ```
 
 Les expressions valides dans une chaîne `f"…"` sont évaluées. Si une portion entre accolades ne peut pas être analysée comme expression, elle est conservée telle quelle dans le texte.
@@ -111,7 +115,7 @@ Les expressions valides dans une chaîne `f"…"` sont évaluées. Si une portio
 Les listes utilisent des parenthèses, les positions commencent à zéro :
 
 ```text
-var nombres.list = (10, 20, 30)
+var numbers.list = (10, 20, 30)
 add nombres.list = {1, 15}
 set nombres.list = {0, 5}
 del nombres.list = 2
@@ -133,22 +137,22 @@ del config.dict = "active"
 
 Les clés/positions doivent être valides. Un renommage de clé ne doit pas écraser une clé existante.
 
-## Entrées utilisateur
+## Entrées user
 
 Une entrée est déclarée avec `.input` suivi du type attendu et de la question. `input` est un modificateur de déclaration, pas un type.
 
 ```text
-var pseudo.input{str, "Quel est ton pseudo ?"} = ""
-var age.input{int, "Quel âge as-tu ?"} = ""
-var actif.input{bool, "Activer la fonctionnalité ?"} = False
-var cible.input{user.id, "Quel est l'identifiant Discord ?"} = ""
+var username.input{str, "What is your username?"} = ""
+var age.input{int, "How old are you?"} = ""
+var actif.input{bool, "Enable this feature?"} = False
+var cible.input{user.id, "What is the Discord ID?"} = ""
 ```
 
-Types pris en charge par les entrées : `str`, `int`, `float`, `bool`, `user.id`, `chanel.id`, `categorie.id`, `role.id` et `message.id`. Les entrées de type liste et dictionnaire ne sont pas prises en charge.
+Types pris en charge par les entrées : `str`, `int`, `float`, `bool`, `user.id`, `channel.id`, `category.id`, `role.id` et `message.id`. Les entrées de type liste et dictionnaire ne sont pas prises en charge.
 
 Fonctionnement prévu :
 
-1. Le bot envoie la question dans le salon où le script a été lancé.
+1. Le bot envoie la question dans le channel où le script a été lancé.
 2. Il attend la prochaine réponse de la personne qui a lancé le script.
 3. La réponse est convertie et validée selon le type attendu.
 4. Le délai d'attente est d'une minute.
@@ -160,8 +164,8 @@ Une entrée booléenne doit permettre d'obtenir `True` ou `False`.
 
 ### Collections
 
-- `guild.user` : membres du serveur.
-- `guild.chanel` : salons du serveur.
+- `guild.member` : members du serveur.
+- `guild.channel` : channels du serveur.
 - `guild.role` : rôles du serveur.
 
 Sans propriété, une collection ou un objet ciblé par défaut représente son identifiant. Une propriété explicite permet d'accéder à une autre donnée.
@@ -170,8 +174,8 @@ Sans propriété, une collection ou un objet ciblé par défaut représente son 
 
 | Objet | Propriétés prévues |
 |---|---|
-| Utilisateur/membre | `.id`, `.name`, `.display_name`, `.bot`, `.role` |
-| Salon (`chanel`) | `.id`, `.name`, `.category`, `.perm`, `.slowmode`, `.type` |
+| Utilisateur/member | `.id`, `.name`, `.display_name`, `.bot`, `.role` |
+| Salon (`channel`) | `.id`, `.name`, `.category`, `.perm`, `.slowmode`, `.type` |
 | Catégorie | `.id`, `.name`, `.perm` |
 | Rôle | `.id`, `.name`, `.color`, `.perm`, `.position`, `.managed` |
 | Message | `.id`, `.content`, `.author`, `.channel` |
@@ -180,13 +184,13 @@ La disponibilité exacte d'une propriété doit être vérifiée dans l'impléme
 
 ```text
 for role in guild.role {
-    if (role.name == "Ancien rôle") {
-        @delete_role(role.id, "Nettoyage");
+    if (role.name == "Old role") {
+        @delete_role(role.id, "Cleanup");
     }
 }
 
-if ("Modérateur" in guild.role.name) {
-    @send("Le rôle Modérateur existe");
+if ("Moderator" in guild.role.name) {
+    @send("Le rôle Moderator existe");
 }
 ```
 
@@ -209,35 +213,35 @@ Tous les appels de fonctions commencent par `@`. Seules les fonctions répertori
 
 | Fonction | Paramètres | Résultat attendu |
 |---|---|---|
-| `@ban(user, raison?)` | Utilisateur, raison facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
-| `@kick(user, raison?)` | Utilisateur, raison facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
-| `@unban(user_id)` | Identifiant utilisateur uniquement | `True` en cas de succès ; sinon `False` avec une erreur explicative |
-| `@mute(user, durée, raison?)` | Utilisateur, durée, raison facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
-| `@unmute(user, raison?)` | Utilisateur, raison facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
+| `@ban(user, reason?)` | Utilisateur, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
+| `@kick(user, reason?)` | Utilisateur, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
+| `@unban(user_id)` | Identifiant user uniquement | `True` en cas de succès ; sinon `False` avec une erreur explicative |
+| `@mute(user, durée, reason?)` | Utilisateur, durée, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
+| `@unmute(user, reason?)` | Utilisateur, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
 
-### Salons et catégories
+### Salons et categorys
 
 | Fonction | Rôle |
 |---|---|
-| `@create_chanel(nom, perm?, categorie?)` | Crée un salon et doit renvoyer son identifiant `chanel.id` en cas de succès. |
-| `@delete_chanel(id, raison?)` | Supprime un salon. |
-| `@set_chanel.name{chanel_id, nom}` | Modifie le nom d'un salon. |
-| `@set_chanel.color{chanel_id, couleur}` | Modifie une couleur lorsque cette propriété s'applique à la cible. |
-| `@set_chanel.perm{chanel_id, permission:True;autre_permission:False}` | Modifie une ou plusieurs permissions du salon. |
-| `@slowmode(chanel, secondes)` | Configure le mode lent du salon. |
-| `@lock(chanel)` | Verrouille le salon selon les permissions Discord. |
+| `@create_chanel(nom, perm?, categorie?)` | Crée un channel et doit renvoyer son identifiant `channel.id` en cas de succès. |
+| `@delete_chanel(id, reason?)` | Supprime un channel. |
+| `@set_chanel.name{chanel_id, nom}` | Modifie le nom d'un channel. |
+| `@set_chanel.color{chanel_id, color}` | Modifie une color lorsque cette propriété s'applique à la cible. |
+| `@set_chanel.perm{chanel_id, permission:True;autre_permission:False}` | Modifie une ou plusieurs permissions du channel. |
+| `@slowmode(chanel, seconds)` | Configure le mode lent du channel. |
+| `@lock(chanel)` | Verrouille le channel selon les permissions Discord. |
 | `@unlock(chanel)` | Retire le verrouillage appliqué par le bot. |
 
 ### Rôles
 
 | Fonction | Rôle |
 |---|---|
-| `@create_role(nom, couleur?, perm?)` | Crée un rôle et doit renvoyer son identifiant `role.id` en cas de succès. |
-| `@delete_role(id, raison?)` | Supprime un rôle. |
+| `@create_role(nom, color?, perm?)` | Crée un rôle et doit renvoyer son identifiant `role.id` en cas de succès. |
+| `@delete_role(id, reason?)` | Supprime un rôle. |
 | `@set_role.name{role_id, nom}` | Modifie le nom d'un rôle. |
-| `@set_role.color{role_id, "#RRGGBB"}` | Modifie la couleur d'un rôle. |
+| `@set_role.color{role_id, "#RRGGBB"}` | Modifie la color d'un rôle. |
 | `@set_role.perm{role_id, permission:True;autre_permission:False}` | Modifie une ou plusieurs permissions du rôle. |
-| `@give_role(user, role)` | Attribue un rôle à un utilisateur. |
+| `@give_role(user, role)` | Attribue un rôle à un user. |
 
 Pour `.perm`, chaque permission reçoit `True` ou `False`. Plusieurs changements peuvent être séparés par des points-virgules. Les noms de permissions acceptés doivent correspondre aux permissions Discord prises en charge par le bot.
 
@@ -245,12 +249,12 @@ Pour `.perm`, chaque permission reçoit `True` ou `False`. Plusieurs changements
 
 | Fonction | Rôle |
 |---|---|
-| `@send(message)` | Envoie un message dans le salon où le script a été lancé. |
-| `@send(chanel, message)` | Envoie un message dans le salon indiqué. |
-| `@dm(user, message)` | Envoie un message privé à l'utilisateur. |
+| `@send(message)` | Envoie un message dans le channel où le script a été lancé. |
+| `@send(chanel, message)` | Envoie un message dans le channel indiqué. |
+| `@dm(user, message)` | Envoie un message privé à l'user. |
 | `@clear(nombre)` | Supprime le nombre de messages indiqué, dans les limites imposées par Discord. |
 
-Les messages peuvent être des chaînes normales ou formatées : `@send(f"Bienvenue {membre.name} !")`.
+Les messages peuvent être des chaînes normales ou formatées : `@send(f"Welcome {member.name} !")`.
 
 ## Durées
 
@@ -259,7 +263,7 @@ Le type `time` représente une durée. Sans suffixe, la valeur est exprimée en 
 | Suffixe | Unité |
 |---|---|
 | aucun | minutes |
-| `s`, `sec` | secondes |
+| `s`, `sec` | seconds |
 | `m`, `min` | minutes |
 | `h` | heures |
 | `d` | jours |
@@ -285,7 +289,7 @@ Un résultat `False` correspond à un échec à l'exécution, pas à une erreur 
 
 - Une syntaxe inconnue ou un appel à une fonction non autorisée provoque une erreur de compilation.
 - Les types des variables et des arguments sont vérifiés avant l'exécution lorsque c'est possible.
-- Les entrées utilisateur sont validées quand la réponse est reçue.
+- Les entrées user sont validées quand la réponse est reçue.
 - Le script est limité à 1 000 actions.
 - La compilation est limitée à 5 minutes et l'exécution à 5 minutes supplémentaires, soit 10 minutes maximum au total.
 - Les boucles dépendant de l'état réel du serveur peuvent produire un nombre d'actions variable ; un compteur d'actions doit donc aussi être appliqué pendant l'exécution.
@@ -294,17 +298,17 @@ Un résultat `False` correspond à un échec à l'exécution, pas à une erreur 
 ## Exemple complet
 
 ```text
-var pseudo.input{str, "Quel est ton pseudo ?"} = ""
-var avertissements.int = 0
-var actif.bool = True
+var username.input{str, "What is your username?"} = ""
+var warnings.int = 0
+var enabled.bool = True
 
 if (actif == True) {
-    @send(f"Bienvenue {pseudo} !");
+    @send(f"Welcome {pseudo} !");
 }
 
 for role in guild.role {
-    if (role.name == "Ancien rôle") {
-        @delete_role(role.id, "Rôle obsolète");
+    if (role.name == "Old role") {
+        @delete_role(role.id, "Obsolete role");
     }
 }
 
@@ -312,7 +316,7 @@ repeat(3) {
     set avertissements = avertissements + 1
 }
 
-@send(f"Nombre de vérifications : {avertissements}");
+@send(f"Number of checks : {avertissements}");
 ```
 
 ---
