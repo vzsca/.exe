@@ -49,7 +49,7 @@ class DiscordIntegrationTests(IsolatedAsyncioTestCase):
         ctx, channel, _, _ = make_context(owner_id, [short, long])
         bot = build_bot(Settings(token="test", owner_id=owner_id, database_path=str(tmp_path / "db.sqlite3")))
         try:
-            await bot.get_command("exe").callback(ctx, script='send(f"@Moderator; @Mod")')
+            await bot.get_command("exe").callback(ctx, script='@send(f"@Moderator; @Mod");')
             channel.send.assert_awaited_once()
             sent_text = channel.send.await_args.args[0]
             allowed = channel.send.await_args.kwargs["allowed_mentions"].roles
@@ -67,7 +67,7 @@ class DiscordIntegrationTests(IsolatedAsyncioTestCase):
         bot = build_bot(Settings(token="test", owner_id=owner_id, database_path=str(tmp_path / "db.sqlite3")))
         try:
             await bot.get_command("exe").callback(
-                ctx, script='send(f"Created @22222222222222222")'
+                ctx, script='@send(f"Created @22222222222222222");'
             )
             channel.send.assert_awaited_once()
             self.assertEqual(channel.send.await_args.args[0], f"Created {selected_role.mention}")
