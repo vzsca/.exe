@@ -27,13 +27,13 @@ Déclaration : `var name.type = value;`
 
 Types acceptés par le parseur : `str`, `int`, `float`, `bool`, `list`, `dict`, `time`, `user.id`, `channel.id`, `category.id`, `role.id`, `message.id`.
 
-Les déclarations typées vérifient la compatibilité des valeurs initiales et des affectations avec le type déclaré. `float` accepte aussi les entiers ; `list` accepte une liste ou un tuple ; `time` accepte un nombre ou une chaîne. `user.id`, `channel.id`, `category.id`, `role.id` et `message.id` acceptent une chaîne, un entier ou `None` pour représenter une référence non renseignée. Les suffixes `.id` ne garantissent pas à eux seuls l'existence de l'objet Discord. Le type `dict` est reconnu par la vérification de type, mais reste inutilisable pour créer un dictionnaire tant que la limitation décrite ci-dessous existe.
+Les déclarations typées vérifient la compatibilité des valeurs initiales et des affectations avec le type déclaré. `float` accepte aussi les entiers ; `list` accepte une liste ou un tuple ; `dict` accepte un dictionnaire ; `time` accepte un nombre ou une chaîne. `user.id`, `channel.id`, `category.id`, `role.id` et `message.id` acceptent une chaîne, un entier ou `None` pour représenter une référence non renseignée. Les suffixes `.id` ne garantissent pas à eux seuls l'existence de l'objet Discord.
 
 Pour mettre à jour une variable existante : `set name = expression;`
 
 Les expressions sûres prennent en charge les constantes, variables, listes et tuples littéraux, indexation, opérations arithmétiques (`+`, `-`, `*`, `/`, `//`, `%`), opérations booléennes (`and`, `or`, `not`) et comparaisons (`==`, `!=`, `<`, `<=`, `>`, `>=`). Les appels de fonctions arbitraires et l'accès aux attributs Python ne sont pas permis dans les expressions.
 
-**Limitation actuelle concernant les dictionnaires :** même si `dict` figure parmi les types reconnus et que l'évaluateur interne sait lire un dictionnaire Python, les accolades `{}` sont réservées aux blocs et le validateur de syntaxe refuse les dictionnaires littéraux. Il n'existe donc actuellement aucune syntaxe documentée permettant de construire une valeur `dict` dans un script. Ne pas utiliser `{ "clé": "valeur" }` comme expression ; cette fonctionnalité devra être corrigée dans le parseur avant d'être annoncée comme prise en charge.
+Les dictionnaires littéraux sont pris en charge, y compris les dictionnaires imbriqués. Exemple : `var config.dict = {"mode": "safe", "retries": 3};`. Les clés et valeurs doivent respecter les expressions sûres prises en charge. L'indexation permet de lire une valeur, par exemple `config["mode"]`. Les accolades qui suivent un en-tête `if`, `else`, `repeat` ou `for` continuent de délimiter les blocs.
 
 Valeurs booléennes : `True`, `False`; valeur vide : `None`. `randint(min, max)` est accepté comme expression bornée.
 
