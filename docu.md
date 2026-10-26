@@ -96,7 +96,7 @@ Toutes les fonctions natives doivent commencer par `@`.
 | `@delete_role(role_id_or_name)` | 1 argument | Supprime un rôle identifié par ID ou nom exact. |
 | `@create_category(name, permissions?)` | 1 à 2 arguments | Crée une catégorie. |
 | `@create_channel(name, category?, permissions?)` | 1 à 3 arguments | Crée un salon texte, éventuellement dans une catégorie existante, avec des permissions de salon. |
-| `@delete_channel(channel_id_or_name)` | 1 argument | Supprime un salon texte identifié par ID ou nom exact. |
+| `@delete_channel(channel_id_or_name)` | 1 argument | Supprime uniquement un salon texte identifié par ID ou nom exact ; les catégories sont refusées. |
 | `@slowmode(seconds)` | 1 argument | Configure le mode lent dans le contexte pris en charge. |
 | `@clear(count)` | 1 argument | Supprime un nombre limité de messages. |
 | `@guilds_roles()` | aucun | Liste les rôles du serveur. |
