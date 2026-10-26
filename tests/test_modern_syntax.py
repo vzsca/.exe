@@ -31,10 +31,10 @@ def test_brace_if_and_repeat_syntax():
 
 
 def test_canonical_english_action_names_are_supported():
-    assert parse_script('@add_role("123456789012345678", "Helpers")') == [
+    assert parse_script('@add_role("123456789012345678", "Helpers");') == [
         DiscordAction("give_role", ("123456789012345678", "Helpers"))
     ]
-    assert parse_script('@create_channel("general")') == [
+    assert parse_script('@create_channel("general");') == [
         DiscordAction("create_channel", ("general",))
     ]
 
