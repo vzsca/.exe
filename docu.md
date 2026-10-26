@@ -104,13 +104,22 @@ Native calls must start with @.
 
 For @create_role, permission names are explicitly allowlisted in the runtime. They include selected channel, voice, moderation, and audit-log permissions, but not administrator. Category/channel overwrites use entries such as "@everyone:view_channel=deny, Moderators:send_messages=allow". Targets can be @everyone, a role ID, or an exact role name.
 
-The declaration grammar is `var variable_name.type`. For a role reference, use `var new_role.role.id = None;` (the variable name is `new_role`, and its type is `role.id`). Writing `var role.id` instead declares a variable named `role` with the unsupported type `id`.
+The declaration grammar is `var variable_name.type`. A full role-reference declaration is `var new_role.role.id = None;`. For convenience, `var role.id = None;` is also accepted as shorthand for a variable named `role` of type `role.id`.
 
 To reuse a role created by a script, declare a role.id variable and assign it the native action result:
 
     var helper_role.role.id = None;
     set helper_role = @create_role("Helpers", "#5865F2");
     @add_role("123456789012345678", helper_role);
+
+Or create a role and include its mention directly in a message f-string:
+
+    var test.int = 10;
+    repeat(3) {
+        @send(f"{test}{@create_role(\"Helpers\", \"#5865F2\")}");
+    }
+
+A created role can also be referenced in a later f-string with `@send(f"{helper_role}");`. User input is still neutralized to prevent unexpected mentions. The `administrator` permission remains forbidden even if the embedded call uses `administrator:True`.
 
 The result is stored as an internal role reference and resolved during execution. The variable must be declared first and have type role.id. This assignment form is currently supported for @create_role only.
 
