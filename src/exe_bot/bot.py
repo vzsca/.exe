@@ -240,8 +240,8 @@ def build_bot(settings: Settings) -> ExeBot:
                 permissions=role_permissions,
                 reason=f".exe by {actor.id}",
             )
-            # Return the immutable ID so duplicate role names cannot resolve to an older role.
-            return f"@{created_role.id}"
+            # Return the numeric ID so the role can be passed directly to give_role/remove_role.
+            return str(created_role.id)
         elif name == "delete_role":
             raw = str(args[0])
             role = guild.get_role(int(raw)) if raw.isdigit() else discord.utils.get(guild.roles, name=raw)
@@ -462,6 +462,13 @@ def build_bot(settings: Settings) -> ExeBot:
                         )
                     elif isinstance(action, DiscordAction):
                         try:
+                            resolved_arguments = []
+                            for argument in action.arguments:
+                                if isinstance(argument, str):
+                                    for variable_name, variable_value in runtime_variables.items():
+                                        argument = argument.replace(f"__EXE_VAR_{variable_name}__", variable_value)
+                                resolved_arguments.append(argument)
+                            action = DiscordAction(action.name, tuple(resolved_arguments), action.result_variable)
                             action_result = await execute_discord_action(ctx, action)
                             if action.result_variable and action_result is not None:
                                 runtime_variables[action.result_variable] = action_result
