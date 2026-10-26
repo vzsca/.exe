@@ -84,10 +84,10 @@ def build_bot(settings: Settings) -> ExeBot:
             else:
                 entries = [f"{category.name} (ID: {category.id})" for category in sorted(guild.categories, key=lambda item: item.position)]
             safe_entries = [entry.replace("@", "@\u200b") for entry in entries]
-            suffix = "\n… liste limitée à 100 éléments." if name == "guilds_members" and len(entries) >= 100 else ""
-            result = ("\n".join(safe_entries) if safe_entries else "(aucun élément)") + suffix
+            suffix = "\n… list limited to 100 entries." if name == "guilds_members" and len(entries) >= 100 else ""
+            result = ("\n".join(safe_entries) if safe_entries else "(no entries)") + suffix
             if len(result) > 1700:
-                result = result[:1690] + "\n… résultat tronqué."
+                result = result[:1690] + "\n… result truncated."
             return result
         if not isinstance(actor, discord.Member):
             raise ScriptError("Could not verify your server permissions.")
