@@ -159,3 +159,35 @@ def test_or_operator_short_circuits():
         '@send("safe");'
     )
     assert program[1].value is True
+
+
+def test_dictionary_literal_and_indexing():
+    program = parse_script(
+        'var config.dict = {"mode": "safe", "retries": 3}; '
+        'var mode.str = config["mode"]; '
+        'var retries.int = config["retries"]; '
+        '@send(f"{mode}:{retries}");'
+    )
+    assert program[0].value == {"mode": "safe", "retries": 3}
+    assert program[1].value == "safe"
+    assert program[2].value == 3
+    assert expand_actions(program) == [SendMessage("safe:3")]
+
+
+def test_nested_dictionary_and_list_literals():
+    program = parse_script(
+        'var config.dict = {"items": [1, 2], "nested": {"enabled": True}}; '
+        'var enabled.bool = config["nested"]["enabled"]; '
+        '@send(f"{enabled}");'
+    )
+    assert program[0].value == {"items": [1, 2], "nested": {"enabled": True}}
+    assert program[1].value is True
+    assert expand_actions(program) == [SendMessage("True")]
+
+
+def test_dictionary_literal_does_not_break_following_block():
+    program = parse_script(
+        'var config.dict = {"mode": "safe"}; '
+        'if (config["mode"] == "safe") { @send("ok"); }'
+    )
+    assert expand_actions(program) == [SendMessage("ok")]
