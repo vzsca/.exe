@@ -5,7 +5,7 @@ Cette page décrit uniquement les fonctionnalités réellement prévues par le p
 ## Règles de syntaxe
 
 - Les mots-clés, types et noms de fonctions sont en anglais.
-- Toute instruction doit se terminer par `; ` sans l'espace final : le caractère `;` est obligatoire.
+- Toute instruction doit se terminer par `;` : le point-virgule est obligatoire.
 - Le retour à la ligne est facultatif après un point-virgule.
 - Les blocs utilisent `{` et `}`. Les accolades des blocs ne sont pas suivies d'un point-virgule.
 - Les appels natifs commencent toujours par `@`.
