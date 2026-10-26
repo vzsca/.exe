@@ -147,3 +147,60 @@ def test_reassignment_type_is_checked_inside_if_block():
 def test_integer_value_is_allowed_for_float_variable():
     program = parse_script('var ratio.float = 2; @send(f"{ratio}");')
     assert expand_actions(program) == [SendMessage("2")]
+
+
+@pytest.mark.parametrize(
+    ("type_name", "raw", "expected"),
+    [
+        ("int", "42", 42),
+        ("float", "2.5", 2.5),
+        ("bool", "true", True),
+        ("bool", "non", False),
+        ("user.id", "<@123456789012345678>", 123456789012345678),
+        ("str", " hello ", " hello "),
+    ],
+)
+def test_declared_input_values_are_converted(type_name, raw, expected):
+    from exe_bot.language import parse_input_value
+
+    assert parse_input_value(raw, type_name) == expected
+
+
+@pytest.mark.parametrize(
+    ("type_name", "raw"),
+    [
+        ("int", "4.2"),
+        ("float", "not a number"),
+        ("float", "nan"),
+        ("bool", "maybe"),
+        ("user.id", "not-an-id"),
+    ],
+)
+def test_declared_input_values_reject_invalid_responses(type_name, raw):
+    from exe_bot.language import parse_input_value
+
+    with pytest.raises(ScriptError, match="does not match declared type"):
+        parse_input_value(raw, type_name)
+
+
+def test_input_instruction_keeps_declared_numeric_type():
+    program = parse_script(
+        'var age.input{int, "How old are you?"} = 0; @send(f"age={age}");'
+    )
+    assert isinstance(program[0], InputVariable)
+    assert program[0].type_name == "int"
+
+
+def test_nested_repeats_respect_action_budget():
+    with pytest.raises(ScriptError, match="limit of 3"):
+        parse_script(
+            'repeat(2) { repeat(2) { @send("x"); } }',
+            max_actions=3,
+        )
+
+
+def test_input_response_length_limit_is_enforced_by_runtime_contract():
+    from exe_bot.language import parse_input_value
+
+    with pytest.raises(ScriptError):
+        parse_input_value("x" * 1801, "str")
