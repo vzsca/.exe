@@ -147,8 +147,20 @@ def _eval_expression(node: ast.AST, variables: dict[str, object]) -> object:
     if isinstance(node, ast.UnaryOp) and type(node.op) in _ALLOWED_UNARYOPS:
         return _ALLOWED_UNARYOPS[type(node.op)](_eval_expression(node.operand, variables))
     if isinstance(node, ast.BoolOp) and isinstance(node.op, (ast.And, ast.Or)):
-        values = [_eval_expression(item, variables) for item in node.values]
-        return all(values) if isinstance(node.op, ast.And) else any(values)
+        # Preserve Python's short-circuit semantics without evaluating arbitrary code.
+        if isinstance(node.op, ast.And):
+            result: object = True
+            for item in node.values:
+                result = _eval_expression(item, variables)
+                if not result:
+                    return result
+            return result
+        result = False
+        for item in node.values:
+            result = _eval_expression(item, variables)
+            if result:
+                return result
+        return result
     if isinstance(node, ast.Compare):
         left = _eval_expression(node.left, variables)
         for operator, comparator in zip(node.ops, node.comparators):
