@@ -16,7 +16,7 @@ La syntaxe du langage utilise des noms anglais : `member`, `channel`, `category`
 
 ## Syntaxe générale
 
-Les blocs utilisent `{}`. Les retours à la ligne et l'indentation sont facultatifs. Le point-virgule `;` sépare les instructions.
+Les blocs utilisent `{}`. **Chaque instruction doit se terminer par `;`**. Le retour à la ligne est facultatif après ce séparateur : plusieurs instructions peuvent donc être écrites sur une même ligne. Les en-têtes de blocs (`if (...) {`, `repeat(...) {`, etc.) et les accolades fermantes `}` ne prennent pas de `;` à eux seuls. Les anciennes syntaxes compactes et les appels sans `@` ne font pas partie du langage.
 
 ```text
 var name.str = "Tests"; var count.int = 3; @send(f"{name}: {count}");
@@ -46,15 +46,15 @@ Chaque variable doit déclarer son type :
 Convention internationale : les mots-clés, noms de types, collections, propriétés et fonctions du langage utilisent l'anglais. Les noms français ne sont utilisés que dans les explications de cette documentation ou dans les textes écrits par l'auteur du script.
 
 ```text
-var username.str = "Alex"
-var attempts.int = 3
-var ratio.float = 1.5
-var enabled.bool = True
-var target.user.id = None
-var channels.list = ()
-var configuration.dict = []
-var wait.time = 10
-set attempts = 4
+var username.str = "Alex";
+var attempts.int = 3;
+var ratio.float = 1.5;
+var enabled.bool = True;
+var target.user.id = None;
+var channels.list = ();
+var configuration.dict = [];
+var wait.time = 10;
+set attempts = 4;
 ```
 
 `None` signifie qu’aucune valeur n’est définie. Il peut initialiser une variable typée en attente d’une valeur, notamment un identifiant Discord. `""` reste une chaîne vide de type `str`. Une liste vide s'écrit `()`, un dictionnaire vide `[]`. `set nom = valeur` modifie une variable existante, sans répéter son type ; une valeur incompatible produit une erreur de type.
@@ -102,8 +102,8 @@ for i in range(0, 5) {
 ## Chaînes formatées
 
 ```text
-var username.str = "Alex"
-var score.int = 12
+var username.str = "Alex";
+var score.int = 12;
 @send(f"Player: {username}, score: {score}");
 @send(f"Prochain score: {score + 1}");
 ```
@@ -115,10 +115,10 @@ Les expressions valides dans une chaîne `f"…"` sont évaluées. Si une portio
 Les listes utilisent des parenthèses, les positions commencent à zéro :
 
 ```text
-var numbers.list = (10, 20, 30)
-add numbers.list = (1, 15)
-set numbers.list = (0, 5)
-del numbers.list = 2
+var numbers.list = (10, 20, 30);
+add numbers.list = (1, 15);
+set numbers.list = (0, 5);
+del numbers.list = 2;
 ```
 
 - `add list = (position, value)` inserts a value.
@@ -128,11 +128,11 @@ del numbers.list = 2
 Les dictionnaires utilisent des crochets et des paires clé/valeur :
 
 ```text
-var config.dict = ["mode": "test", "active": True]
-add config.dict = ("language", "en")
-set config.dict.value = ("mode", "production")
-set config.dict.key = ("language", "locale")
-del config.dict = "active"
+var config.dict = ["mode": "test", "active": True];
+add config.dict = ("language", "en");
+set config.dict.value = ("mode", "production");
+set config.dict.key = ("language", "locale");
+del config.dict = "active";
 ```
 
 Dictionary deletion is performed by key only, never by position. Keys and positions must be valid. Renaming a key must not overwrite an existing key.
@@ -270,9 +270,9 @@ The `time` type represents a duration. Without a suffix, the value is in minutes
 Suffixes are case-insensitive.
 
 ```text
-var short.time = 30sec
-var standard.time = 10
-var long.time = 2h
+var short.time = 30sec;
+var standard.time = 10;
+var long.time = 2h;
 @mute(target, standard, "Spam");
 ```
 
@@ -297,9 +297,9 @@ Un résultat `False` correspond à un échec à l'exécution, pas à une erreur 
 ## Exemple complet
 
 ```text
-var username.input{str, "What is your username?"} = ""
-var warnings.int = 0
-var enabled.bool = True
+var username.input{str, "What is your username?"} = "";
+var warnings.int = 0;
+var enabled.bool = True;
 
 if (enabled == True) {
     @send(f"Welcome {username}!");
@@ -312,7 +312,7 @@ for role in guild.role {
 }
 
 repeat(3) {
-    set warnings = warnings + 1
+    set warnings = warnings + 1;
 }
 
 @send(f"Number of checks: {warnings}");
