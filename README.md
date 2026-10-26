@@ -1,62 +1,118 @@
-# `.exe` — langage de scripts pour Discord
+# .exe — Discord scripting bot
 
-`.exe` est un bot Discord Python qui propose un langage de script dédié aux actions Discord. Ce langage **n'est pas Python** : seules les instructions autorisées par le moteur sont acceptées.
+.exe is a Python Discord bot with a small, allowlisted scripting language for sending messages and performing server-management actions. **It is not Python**: scripts cannot execute arbitrary Python code.
 
-## Source de vérité
+## Features
 
-La documentation du langage est dans **[`docu.md`](docu.md)**. Les exemples de ce README suivent sa syntaxe moderne : déclarations typées avec `var`, appels natifs préfixés par `@`, blocs entre accolades et point-virgule obligatoire après chaque instruction.
+- Typed variables, safe expressions, dictionaries, bounded loops, and if/else blocks.
+- Message sending, including supported role mentions in f-strings.
+- Moderation and channel/role management guarded by Discord permissions and role hierarchy.
+- Per-user saved scripts and an owner-managed execution whitelist.
+- SQLite persistence and configurable script time/action limits.
+- Windows and Linux startup scripts, plus an optional cross-platform terminal control panel.
 
-## Exemple
+## Example
 
-```text
-var greeting.str = "Hello";
-var count.int = 3;
+    var greeting.str = "Hello";
+    var count.int = 3;
+    var config.dict = {"mode": "safe", "retries": 2};
+    var mode.str = config["mode"];
 
-if (count == 3) {
-    @send(f"{greeting}: {count}");
-} else {
-    @send("Not enough");
-}
+    if (count == 3) {
+        @send(mode);
+    } else {
+        @send("Not enough");
+    }
 
-repeat(2) {
-    @send("Done");
-}
-```
+    repeat(2) {
+        @send("Done");
+    }
 
-Les retours à la ligne sont facultatifs **après** un `;`. Les instructions peuvent donc être enchaînées sur une seule ligne. Les accolades ouvrantes des blocs et les accolades fermantes ne prennent pas de point-virgule. Les syntaxes historiques (`let`, `send(...)` sans `@`, `m(...)`, `v(...)`, `R(...)`, `I(...)`, `E(...)`) ne font pas partie du langage moderne.
+Every instruction must end with a semicolon. Block braces do not need a trailing semicolon. See [docu.md](docu.md) for the complete reference to supported syntax and native actions.
 
-## Utilisation du bot
+## Requirements
 
-- `!exe <script>` — compile puis exécute un script.
-- `!exe create <name> :: <script>` — valide et enregistre un script.
-- `!exe list` — liste tes scripts enregistrés.
-- `!exe run <name>` — exécute l'un de tes scripts.
-- `!exe delete <name>` — supprime l'un de tes scripts.
-- `!exe admin add @user`, `!exe admin remove @user`, `!exe admin list` — commandes réservées au propriétaire configuré.
+- Python 3.12 or newer
+- A Discord bot application and token
+- A bot invitation with only the permissions it needs
 
-Seuls les utilisateurs autorisés par la whitelist peuvent lancer ou gérer leurs scripts. Les actions Discord restent soumises aux permissions effectives et à la hiérarchie des rôles.
+Enable **Message Content Intent** in the Discord Developer Portal. Enable **Server Members Intent** only if you need the @guilds_members() action. The bot also needs the relevant Discord permissions for any moderation or management actions you run.
 
 ## Installation
 
-Python 3.12 ou plus récent est requis.
+Clone the repository and create a virtual environment:
 
-```sh
-python -m venv .venv
-# Linux/macOS
-source .venv/bin/activate
-# Windows PowerShell : .venv\Scripts\Activate.ps1
-python -m pip install -e .
-```
+    git clone https://github.com/vzsca/.exe.git
+    cd .exe
+    python -m venv .venv
 
-Copie `.env.example` vers `.env`, renseigne `DISCORD_TOKEN` et `OWNER_ID`, puis démarre le bot avec la commande de lancement du projet.
+Activate it:
+
+    # Linux / macOS
+    source .venv/bin/activate
+
+    # Windows PowerShell
+    .venv\Scripts\Activate.ps1
+
+Install the project and development dependencies:
+
+    python -m pip install --upgrade pip
+    python -m pip install -e .
+    python -m pip install -r requirements-dev.txt
+
+Copy .env.example to .env and configure these values:
+
+- DISCORD_TOKEN: your bot token from the Discord Developer Portal.
+- OWNER_ID: your numeric Discord user ID.
+- DATABASE_PATH (optional): SQLite database path; defaults to data/exe.sqlite3.
+- SCRIPT_TIMEOUT_SECONDS (optional): script/input timeout, greater than 0 and at most 300 seconds.
+- MAX_SCRIPT_ACTIONS (optional): action budget, from 1 to 1000.
+
+Never commit .env or share your bot token.
+
+## Run the bot
+
+From the repository root, with the virtual environment activated:
+
+    python -m exe_bot
+
+On Windows, start_bot.bat can set up and start the bot. On Linux, use ./start_bot.sh (make it executable first if necessary). The optional control panel can be started with:
+
+    python panel.py
+
+## Discord commands
+
+All commands use the ! prefix.
+
+| Command | Purpose |
+|---|---|
+| !exe <script> | Validate and run a script immediately. |
+| !exe create <name> :: <script> | Validate and save a named script without running it. |
+| !exe list | List your saved scripts. |
+| !exe run <name> | Run one of your saved scripts. |
+| !exe delete <name> | Delete one of your saved scripts. |
+| !exe admin add @user | Add a user to the execution whitelist (owner only). |
+| !exe admin remove @user | Remove a user from the execution whitelist (owner only). |
+| !exe admin list | List whitelisted user IDs (owner only). |
+| !help_exe | Show the built-in language help. |
+
+The configured owner can always run scripts. Other users must be on the whitelist. Saved scripts are scoped to the Discord user who created them.
 
 ## Tests
 
-```sh
-python -m pip install -e . pytest
-python -m pytest
-```
+    python -m pytest -q
 
-## Sécurité et limites
+GitHub Actions runs tests on pushes and pull requests. The tests use mocked Discord objects and do not replace testing the bot in a private test server before granting it permissions.
 
-Le moteur utilise une liste d'instructions autorisées et n'est pas conçu pour exécuter du Python arbitraire. Les scripts ont des limites de taille, d'actions et de temps. Ne partage jamais ton token Discord. Consulte `docu.md` pour la syntaxe documentée et vérifie les fonctionnalités prises en charge par la version installée.
+## Documentation and policies
+
+- [Language reference](docu.md)
+- [Privacy policy template](PRIVACY_POLICY.md)
+- [Terms of use template](TERMS_OF_USE.md)
+- [MIT license](LICENSE)
+
+The privacy policy and terms are templates. Operators must review and adapt them to their deployment and applicable law.
+
+## Security notes
+
+The parser evaluates expressions through an explicit AST allowlist and rejects arbitrary Python calls and attribute access. Discord actions can still make real changes: review scripts before running them, grant the bot minimum required permissions, and test destructive actions in a private server first. Report security issues privately to the repository owner rather than publishing exploit details in an issue.
