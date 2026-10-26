@@ -36,7 +36,7 @@ Every instruction must end with a semicolon. Block braces do not need a trailing
 - A Discord bot application and token
 - A bot invitation with only the permissions it needs
 
-Enable **Message Content Intent** in the Discord Developer Portal. Enable **Server Members Intent** only if you need the @guilds_members() action. The bot also needs the relevant Discord permissions for any moderation or management actions you run.
+Enable **Message Content Intent** in the Discord Developer Portal. **Server Members Intent** is disabled by default; set `ENABLE_MEMBERS_INTENT=true` in `.env` and enable the privileged intent in the Developer Portal only if you need `@guilds_members()`. The bot also needs the relevant Discord permissions for any moderation or management actions you run.
 
 ## Installation
 
@@ -52,7 +52,7 @@ Activate it:
     source venv/bin/activate
 
     # Windows PowerShell
-    .venv\Scripts\Activate.ps1
+    venv\Scripts\Activate.ps1
 
 Install the project and development dependencies:
 
