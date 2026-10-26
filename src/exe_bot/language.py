@@ -1028,7 +1028,13 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
     def validate_declared_types(instruction: Instruction, line_number: int) -> None:
-        if isinstance(instruction, SetVariable) and instruction.name in declared_types:
+        if isinstance(instruction, DiscordAction) and instruction.result_variable and not instruction.result_variable.startswith("__exe_result_"):
+            declared_type = declared_types.get(instruction.result_variable)
+            if declared_type != "role.id":
+                raise ScriptError(
+                    f"Line {line_number}: the result of create_role must be assigned to a variable declared as 'role.id'"
+                )
+        elif isinstance(instruction, SetVariable) and instruction.name in declared_types:
             declared_type = declared_types[instruction.name]
             if declared_type not in _TYPE_NAMES or not _value_matches_type(instruction.value, declared_type):
                 raise ScriptError(
