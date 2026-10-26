@@ -318,7 +318,11 @@ def build_bot(settings: Settings) -> ExeBot:
                             (
                                 channel for channel in channels
                                 if isinstance(channel, discord.CategoryChannel)
-                                and channel.name == raw_category
+                                and (
+                                    channel.id == int(raw_category)
+                                    if raw_category.isdigit()
+                                    else channel.name == raw_category
+                                )
                             ),
                             None,
                         )
