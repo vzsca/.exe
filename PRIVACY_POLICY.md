@@ -1,6 +1,6 @@
 # .exe Privacy Policy Template
 
-Last updated: October 25, 2026
+Last updated: October 26, 2026
 
 ## 1. Scope and controller
 
