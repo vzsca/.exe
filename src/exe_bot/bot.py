@@ -382,7 +382,9 @@ def build_bot(settings: Settings) -> ExeBot:
             raw = str(args[0])
             channel = guild.get_channel(int(raw)) if raw.isdigit() else discord.utils.get(guild.text_channels, name=raw)
             if channel is None:
-                raise ScriptError("Could not find that channel by ID or exact name.")
+                raise ScriptError("Could not find that text channel by ID or exact name.")
+            if not isinstance(channel, discord.TextChannel):
+                raise ScriptError("Only text channels can be deleted with @delete_channel.")
             await channel.delete(reason=f".exe by {actor.id}")
         elif name == "slowmode":
             seconds = args[0]
