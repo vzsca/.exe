@@ -412,6 +412,7 @@ def build_bot(settings: Settings) -> ExeBot:
 
         current_action = {"index": 0, "name": "not started", "completed": 0}
         runtime_variables: dict[str, str] = {}
+        user_input_variables: set[str] = set()
         log.info(".exe script parsed: %d actions (channel=%s actor=%s timeout=%ss)",
                  len(actions), ctx.channel.id, ctx.author.id, settings.script_timeout_seconds)
 
@@ -456,6 +457,7 @@ def build_bot(settings: Settings) -> ExeBot:
                             raise ScriptError("Input response is too long (maximum 1800 characters).")
                         # User input is plain text and must never trigger role pings.
                         runtime_variables[action.name] = answer.content
+                        user_input_variables.add(action.name)
                     elif isinstance(action, SendMessage):
                         target = ctx.channel
                         if action.channel is not None:
@@ -468,8 +470,13 @@ def build_bot(settings: Settings) -> ExeBot:
                                 raise ScriptError("Could not find the target text channel by ID or exact name.")
                         content = action.text
                         for variable_name, variable_value in runtime_variables.items():
-                            # Keep input values intact for comparisons, but neutralize mentions at send time.
-                            safe_value = variable_value.replace("@", "@\u200b")
+                            # Only user-supplied input is untrusted; native action results may
+                            # intentionally contain an internal role-ID token for mention resolution.
+                            safe_value = (
+                                variable_value.replace("@", "@\u200b")
+                                if variable_name in user_input_variables
+                                else variable_value
+                            )
                             content = content.replace(f"__EXE_VAR_{variable_name}__", safe_value)
                         allowed_roles = []
                         if action.role_mentions:
