@@ -837,31 +837,128 @@ def _normalize_modern_syntax(source: str) -> str:
 
 
 def _validate_modern_surface_syntax(source: str) -> None:
-    """Reject legacy spellings and require semicolons after executable statements."""
+    """Validate statement terminators and reject legacy syntax before normalization."""
     legacy_patterns = (
-        (r"(?m)^\s*let\s+", "Legacy let declarations are not supported; use var name.type = value;"),
-        (r"(?m)^\s*v\s*\(", "Compact syntax v(...) is not supported."),
-        (r"(?m)^\s*m\s*\(", "Compact syntax m(...) is not supported."),
-        (r"(?m)^\s*R\s*\(", "Compact syntax R(...) is not supported."),
-        (r"(?m)^\s*I\s*\(", "Compact syntax I(...) is not supported."),
-        (r"(?m)^\s*E\s*\(", "Compact syntax E(...) is not supported."),
-        (r"(?m)^\s*send\s*\(", "Native functions must start with @, for example @send(...);"),
+        (r"(?<![\w@])\blet\s+", "Legacy 'let' declarations are not supported; use 'var name.type = value;'"),
+        (r"(?<![\w@])\bv\s*\(", "Compact syntax v(...) is not supported."),
+        (r"(?<![\w@])\bm\s*\(", "Compact syntax m(...) is not supported."),
+        (r"(?<![\w@])\bR\s*\(", "Compact syntax R(...) is not supported."),
+        (r"(?<![\w@])\bI\s*\(", "Compact syntax I(...) is not supported."),
+        (r"(?<![\w@])\bE\s*\(", "Compact syntax E(...) is not supported."),
+        (r"(?<![@\w])send\s*\(", "Native functions must start with @, for example '@send(...);'"),
+        (r"(?<![@\w])(?:ban|unban|kick|timeout|untimeout|give_role|remove_role|create_role|delete_role|create_category|create_channel|delete_channel|slowmode|clear|dm|lock|unlock|set_channel|set_role)\s*\(", "Native functions must start with '@'."),
     )
+    # Do not scan inside quoted strings: examples and message text may contain
+    # words that look like old syntax.
+    visible: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for char in source:
+        if quote:
+            visible.append(" ")
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+            visible.append(" ")
+        else:
+            visible.append(char)
+    surface = "".join(visible)
     for pattern, message in legacy_patterns:
-        if re.search(pattern, source):
+        if re.search(pattern, surface):
             raise ScriptError(message)
-    for line_number, line in enumerate(source.splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped or stripped.endswith("{") or stripped == "}":
-            continue
-        if stripped.endswith(";") or stripped.startswith("}"):
-            continue
-        if "}" in stripped:
-            tail = stripped.rsplit("}", 1)[1].strip()
-            if not tail or tail.endswith(";"):
-                continue
-        raise ScriptError(f"Line {line_number}: every instruction must end with ';'")
 
+    quote = None
+    escaped = False
+    paren_depth = 0
+    block_depth = 0
+    statement: list[str] = []
+    line_number = 1
+    statement_line = 1
+    input_brace = False
+    for char in source:
+        if escaped:
+            statement.append(char)
+            escaped = False
+            if char == "\n":
+                line_number += 1
+            continue
+        if quote:
+            statement.append(char)
+            if char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            if char == "\n":
+                line_number += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+            statement.append(char)
+        elif char == "(":
+            paren_depth += 1
+            statement.append(char)
+        elif char == ")":
+            if paren_depth == 0:
+                raise ScriptError(f"Line {line_number}: unexpected closing parenthesis")
+            paren_depth -= 1
+            statement.append(char)
+        elif char == "\n":
+            if not "".join(statement).strip():
+                statement = []
+                statement_line = line_number + 1
+            elif paren_depth == 0:
+                raise ScriptError(
+                    f"Line {statement_line}: every instruction must end with ';' before a newline"
+                )
+            line_number += 1
+        elif char == "{" and paren_depth == 0:
+            prefix = "".join(statement).strip()
+            if re.fullmatch(r"var\s+[A-Za-z_]\w*\.input", prefix):
+                input_brace = True
+                statement.append(char)
+            elif input_brace:
+                statement.append(char)
+            elif re.match(r"^(?:if|elif|else|repeat|for)\b", prefix):
+                statement = []
+                block_depth += 1
+                statement_line = line_number
+            else:
+                # Braces are reserved for blocks, not arbitrary expressions.
+                raise ScriptError(f"Line {line_number}: unexpected opening brace")
+        elif char == "}" and paren_depth == 0:
+            if input_brace:
+                input_brace = False
+                statement.append(char)
+            else:
+                if "".join(statement).strip():
+                    raise ScriptError(
+                        f"Line {statement_line}: every instruction inside a block must end with ';'"
+                    )
+                if block_depth == 0:
+                    raise ScriptError(f"Line {line_number}: unexpected closing brace")
+                block_depth -= 1
+                statement = []
+                statement_line = line_number
+        elif char == ";" and paren_depth == 0:
+            if not "".join(statement).strip():
+                raise ScriptError(f"Line {line_number}: empty instruction")
+            statement = []
+            statement_line = line_number
+        else:
+            statement.append(char)
+    if quote:
+        raise ScriptError("Unclosed quote in script")
+    if paren_depth:
+        raise ScriptError("Unclosed parenthesis in script")
+    if "".join(statement).strip():
+        raise ScriptError(f"Line {statement_line}: every instruction must end with ';'")
+    if block_depth:
+        raise ScriptError("Unclosed block brace")
 
 def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     """Parse modern brace-based syntax with mandatory statement semicolons."""
