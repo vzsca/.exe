@@ -325,11 +325,11 @@ def _parse_one(
         return [Repeat(count, tuple(body))]
 
     # Allow a freshly created role to be passed directly to give_role/remove_role.
-    role_assignment = re.fullmatch(r"(give_role|remove_role)\\((.*)\\)", statement)
+    role_assignment = re.fullmatch(r"(give_role|remove_role)\((.*)\)", statement)
     if role_assignment:
         action_name, raw_arguments = role_assignment.groups()
         parts = _split_arguments(raw_arguments)
-        if len(parts) == 2 and re.match(r"^create_role\\s*\\(", parts[1]):
+        if len(parts) == 2 and re.match(r"^create_role\s*\(", parts[1]):
             member_action = _parse_discord_action(f"unban({parts[0]})", line_number, variables)
             if member_action is None:
                 raise ScriptError(f"Line {line_number}: invalid member argument")
