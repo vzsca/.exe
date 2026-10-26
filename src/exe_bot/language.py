@@ -671,6 +671,9 @@ def _parse_one(
                         raise ScriptError(f"Line {line_number}: unsupported expression in f-string: {expression}")
                     result_name = f"__exe_result_{len(deferred_actions)}"
                     deferred_actions.append(DiscordAction("create_role", role_arguments, result_name))
+                    # A create_role result is an explicit role reference, so resolve it
+                    # to a real Discord role mention when the final message is sent.
+                    role_mentions = True
                     chunks.append(f"__EXE_VAR_{result_name}__")
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name):
                     if value.value.id not in variables:
@@ -725,6 +728,7 @@ def _parse_one(
                         args.append(arg_value)
                     result_name = f"__exe_result_{len(deferred_actions)}"
                     deferred_actions.append(DiscordAction("create_role", tuple(args), result_name))
+                    role_mentions = True
                     chunks.append(f"__EXE_VAR_{result_name}__")
                 else:
                     raise ScriptError(f"Line {line_number}: f-strings only support text and defined variables, list/dictionary indexing, and create_role(...)")
