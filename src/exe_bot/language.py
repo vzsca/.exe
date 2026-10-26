@@ -694,7 +694,7 @@ def _normalize_modern_syntax(source: str) -> str:
             stripped = f"let {name} = {value}"
         else:
             input_decl = re.fullmatch(
-                r'var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,\s*("(?:[^"\\]|\\.)*"|\\'(?:[^\\'\\\\]|\\\\.)*\\')\}\s*=\s*(.+)',
+                r"""var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,\s*("(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*')\}\s*=\s*(.+)""",
                 stripped,
             )
             if input_decl:
