@@ -173,3 +173,23 @@ class DiscordActionTests(IsolatedAsyncioTestCase):
                     ctx.guild.create_role.assert_not_awaited()
                 finally:
                     await bot.close()
+
+
+    async def test_delete_channel_rejects_category_id(self):
+        with TemporaryDirectory() as directory:
+            ctx, _, bot = make_context(Path(directory) / "db.sqlite3")
+            category = SimpleNamespace(id=987, name="Important", delete=AsyncMock())
+            ctx.guild.get_channel = lambda channel_id: category if channel_id == 987 else None
+
+            class FakeTextChannel:
+                pass
+
+            with patch("exe_bot.bot.discord.TextChannel", FakeTextChannel):
+                try:
+                    await bot.get_command("exe").callback(
+                        ctx, script='@delete_channel("987");'
+                    )
+                    self.assertIn("Only text channels", ctx.reply.await_args.args[0])
+                    category.delete.assert_not_awaited()
+                finally:
+                    await bot.close()
