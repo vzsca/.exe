@@ -118,3 +118,24 @@ def test_unsafe_expression_call_is_rejected():
 def test_unclosed_block_is_rejected():
     with pytest.raises(ScriptError, match="Unclosed block brace"):
         parse_script('repeat(2) { @send("x");')
+
+
+def test_native_call_inside_string_does_not_trigger_legacy_rejection():
+    assert expand_actions(parse_script('@send("write send( in a message;");')) == [
+        SendMessage("write send( in a message;")
+    ]
+
+
+def test_unprefixed_native_call_is_rejected_even_after_other_statement():
+    with pytest.raises(ScriptError, match="start with"):
+        parse_script('var note.str = "ok"; create_channel("general");')
+
+
+def test_unclosed_quote_is_rejected():
+    with pytest.raises(ScriptError, match="Unclosed quote"):
+        parse_script('@send("not closed);')
+
+
+def test_action_budget_counts_both_if_branches():
+    with pytest.raises(ScriptError, match="limit of 1"):
+        parse_script('var enabled.bool = True; if (enabled == True) { @send("a"); } else { @send("b"); }', max_actions=1)
