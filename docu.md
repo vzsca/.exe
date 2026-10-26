@@ -75,7 +75,7 @@ var username.input{str, "What is your username?"} = "";
 @send(f"Hello {username}!");
 ```
 
-Le parseur accepte la déclaration de saisie pour les types compatibles. La réponse est demandée pendant l'exécution et est soumise au délai maximal configuré. La valeur initiale déclarée est actuellement ignorée.
+La réponse est demandée pendant l'exécution et est soumise au délai maximal configuré. La valeur initiale déclarée est actuellement ignorée. La réponse est convertie et vérifiée selon le type déclaré : `str` conserve le texte, `int` exige un entier, `float` exige un nombre fini, `bool` accepte `true/false`, `vrai/faux`, `oui/non` ou `1/0`, et les types `.id` acceptent un identifiant Discord ou une mention valide. Une réponse invalide arrête le script avec une erreur explicite.
 
 ## Fonctions natives actuellement reconnues
 
