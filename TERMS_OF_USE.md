@@ -1,23 +1,29 @@
-# Conditions d’utilisation de .exe
+# .exe Terms of Use Template
 
-Dernière mise à jour : 25 octobre 2026
+Last updated: October 25, 2026
 
-## 1. Objet et acceptation
-Ces conditions encadrent l’utilisation du logiciel open source .exe, un bot Discord proposant un langage de script limité. En installant ou en utilisant le logiciel, vous acceptez ces conditions et les règles applicables de Discord.
+## 1. Purpose and acceptance
 
-## 2. Utilisation autorisée
-Vous êtes responsable des scripts que vous exécutez, des personnes auxquelles vous donnez accès et de la configuration du bot. N’utilisez pas le logiciel pour harceler, spammer, contourner les permissions Discord, perturber un serveur ou enfreindre la loi. Respectez les Conditions d’utilisation et les règles de la communauté Discord.
+These terms govern use of the open-source .exe software, a Discord bot with a restricted scripting language. By installing or using the software, you agree to these terms and to the applicable Discord rules.
 
-## 3. Permissions et actions destructrices
-Les actions de modération et de gestion de serveur peuvent bannir ou expulser des membres, appliquer un délai, supprimer des salons ou rôles et effacer des messages. Vérifiez chaque script avant exécution et accordez au bot uniquement les permissions nécessaires. Les vérifications du logiciel ne remplacent pas la configuration correcte des rôles Discord.
+## 2. Acceptable use
 
-## 4. Accès et sécurité
-L’administrateur qui héberge le bot est responsable de son jeton, de la liste blanche, de la base de données et des journaux. Ne publiez jamais le jeton du bot ou d’autres secrets. Le logiciel est fourni sans garantie ; les détails figurent dans la licence MIT.
+You are responsible for the scripts you run, the people you grant access to, and the bot's configuration. Do not use the software to harass, spam, bypass Discord permissions, disrupt a server, or break the law. Follow Discord's Terms of Service and Community Guidelines.
 
-## 5. Disponibilité et changements
-Le logiciel est fourni « en l’état ». Les fonctionnalités peuvent évoluer, être modifiées ou retirées. Ces conditions doivent être adaptées par l’exploitant si le bot est distribué ou hébergé pour des tiers.
+## 3. Permissions and destructive actions
+
+Moderation and server-management actions can ban or kick members, apply timeouts, delete channels or roles, and remove messages. Review every script before running it and grant the bot only the permissions it needs. Software checks do not replace a correct Discord role hierarchy and server configuration.
+
+## 4. Access and security
+
+The operator hosting the bot is responsible for its token, whitelist, database, and logs. Never publish the bot token or other secrets. The software is provided without warranty; see the MIT License for details.
+
+## 5. Availability and changes
+
+The software is provided "as is". Features may change, be modified, or be removed. Operators distributing or hosting the bot for third parties should adapt these terms to their deployment.
 
 ## 6. Contact
-Pour signaler un problème, ouvrez une issue dans le dépôt GitHub du projet : https://github.com/vzsca/.exe
 
-Ce document est un modèle informatif, pas un avis juridique. L’exploitant doit le vérifier et le compléter selon son usage réel.
+To report a problem, open an issue in the project's GitHub repository: https://github.com/vzsca/.exe
+
+This document is an informational template, not legal advice. Operators must review and complete it for their own use case.
