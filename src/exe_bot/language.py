@@ -600,9 +600,6 @@ _NATIVE_ALIASES = {
     "unmute": "untimeout",
     "add_role": "give_role",
     "remove_role": "remove_role",
-    "create_chanel": "create_channel",
-    "delete_chanel": "delete_channel",
-    "set_chanel": "set_channel",
 }
 
 
