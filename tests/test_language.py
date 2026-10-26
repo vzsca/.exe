@@ -337,12 +337,12 @@ def test_created_channel_and_category_results_are_typed_and_reusable(
 def test_create_channel_result_requires_channel_id_type():
     with pytest.raises(ScriptError, match="channel.id"):
         parse_script(
-            'var channel.id = None; set channel = @create_channel("annonces"); @send("ok");'
+            'var channel.role.id = None; set channel = @create_channel("annonces"); @send("ok");'
         )
 
 
 def test_create_category_result_requires_category_id_type():
     with pytest.raises(ScriptError, match="category.id"):
         parse_script(
-            'var category.id = None; set category = @create_category("Infos"); @send("ok");'
+            'var category.role.id = None; set category = @create_category("Infos"); @send("ok");'
         )
