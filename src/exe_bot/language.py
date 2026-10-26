@@ -924,6 +924,7 @@ def _validate_modern_surface_syntax(source: str) -> None:
     escaped = False
     paren_depth = 0
     block_depth = 0
+    literal_brace_depth = 0
     statement: list[str] = []
     line_number = 1
     statement_line = 1
@@ -955,32 +956,44 @@ def _validate_modern_surface_syntax(source: str) -> None:
                 raise ScriptError(f"Line {line_number}: unexpected closing parenthesis")
             paren_depth -= 1
             statement.append(char)
-        elif char == "\n":
-            if not "".join(statement).strip():
+        elif char == "\\n":
+            if literal_brace_depth:
+                statement.append(char)
+            elif not "".join(statement).strip():
                 statement = []
                 statement_line = line_number + 1
             elif paren_depth == 0:
                 raise ScriptError(
                     f"Line {statement_line}: every instruction must end with ';' before a newline"
                 )
+            else:
+                statement.append(char)
             line_number += 1
         elif char == "{" and paren_depth == 0:
             prefix = "".join(statement).strip()
-            if re.fullmatch(r"var\s+[A-Za-z_]\w*\.input", prefix):
+            if re.fullmatch(r"var\\s+[A-Za-z_]\\w*\\.input", prefix):
                 input_brace = True
                 statement.append(char)
             elif input_brace:
                 statement.append(char)
-            elif re.match(r"^(?:if|elif|else|repeat|for)\b", prefix):
+            elif literal_brace_depth:
+                literal_brace_depth += 1
+                statement.append(char)
+            elif re.match(r"^(?:if|elif|else|repeat|for)\\b", prefix):
                 statement = []
                 block_depth += 1
                 statement_line = line_number
             else:
-                # Braces are reserved for blocks, not arbitrary expressions.
-                raise ScriptError(f"Line {line_number}: unexpected opening brace")
+                # A non-block brace starts a dictionary literal; the safe expression
+                # evaluator validates its contents after normalization.
+                literal_brace_depth = 1
+                statement.append(char)
         elif char == "}" and paren_depth == 0:
             if input_brace:
                 input_brace = False
+                statement.append(char)
+            elif literal_brace_depth:
+                literal_brace_depth -= 1
                 statement.append(char)
             else:
                 if "".join(statement).strip():
@@ -992,7 +1005,7 @@ def _validate_modern_surface_syntax(source: str) -> None:
                 block_depth -= 1
                 statement = []
                 statement_line = line_number
-        elif char == ";" and paren_depth == 0:
+        elif char == ";" and paren_depth == 0 and literal_brace_depth == 0:
             if not "".join(statement).strip():
                 raise ScriptError(f"Line {line_number}: empty instruction")
             statement = []
