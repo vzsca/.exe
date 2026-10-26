@@ -129,8 +129,8 @@ def build_bot(settings: Settings) -> ExeBot:
         if name in {"give_role", "remove_role"}:
             member_id = target_id(args[0])
             raw_role = str(args[1]).strip()
-            role_mention = re.fullmatch(r"<@&(\\d+)>", raw_role)
-            at_role_id = re.fullmatch(r"@(\\d+)", raw_role)
+            role_mention = re.fullmatch(r"<@&(\d+)>", raw_role)
+            at_role_id = re.fullmatch(r"@(\d+)", raw_role)
             role_id = role_mention.group(1) if role_mention else (
                 at_role_id.group(1) if at_role_id else raw_role
             )
