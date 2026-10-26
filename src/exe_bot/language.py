@@ -465,9 +465,15 @@ def _protect_fstring_expressions(raw_text: str) -> tuple[str, dict[str, str]]:
         expression = content[start:j].strip()
         if not expression:
             raise ScriptError("Empty expression in f-string")
-        name = f"__EXE_EXPR_{len(expressions)}__"
-        expressions[name] = expression
-        output.append("{" + name + "}")
+        # Only custom native calls need protection. Ordinary expressions must stay
+        # visible to Python's AST so existing variable/index/randint handling works.
+        native_call = re.fullmatch(r"@?\s*create_role\s*\(.*\)", expression, re.DOTALL)
+        if native_call:
+            name = f"__EXE_EXPR_{len(expressions)}__"
+            expressions[name] = expression
+            output.append("{" + name + "}")
+        else:
+            output.append("{" + expression + "}")
         i = j + 1
     return "f" + quote + "".join(output) + quote, expressions
 
