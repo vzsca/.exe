@@ -17,7 +17,7 @@ def test_english_brace_syntax_and_at_send():
 
 def test_brace_if_and_repeat_syntax():
     program = parse_script(
-        'var mode.str = "safe"\n'
+        'var mode.str = "safe";\n'
         'if (mode == "safe") {\n'
         '  @send("allowed");\n'
         '}\n'
@@ -41,7 +41,7 @@ def test_canonical_english_action_names_are_supported():
 
 def test_typed_input_declaration_uses_input_instruction():
     program = parse_script(
-        'var username.input{str, "What is your username?"} = ""\n'
+        'var username.input{str, "What is your username?"} = "";\n'
         '@send(f"Hello {username}!")'
     )
     assert isinstance(program[0], InputVariable)
@@ -86,3 +86,12 @@ def test_boolean_and_none_literals_are_preserved():
     program = parse_script('var enabled.bool = True; var target.user.id = None; @send("ready")')
     assert program[0].value is True
     assert program[1].value is None
+
+def test_missing_semicolon_is_rejected():
+    with pytest.raises(ScriptError, match="every instruction must end"):
+        parse_script('var greeting.str = "Hello"\n@send(greeting);')
+
+
+def test_legacy_send_syntax_is_rejected():
+    with pytest.raises(ScriptError, match="must start with @"):
+        parse_script('send("Hello");')
