@@ -147,3 +147,31 @@ def test_reassignment_type_is_checked_inside_if_block():
 def test_integer_value_is_allowed_for_float_variable():
     program = parse_script('var ratio.float = 2; @send(f"{ratio}");')
     assert expand_actions(program) == [SendMessage("2")]
+
+
+def test_send_uses_message_then_optional_channel():
+    program = parse_script('@send("hello", "#123456789012345678");')
+    assert expand_actions(program) == [
+        SendMessage("hello", "#123456789012345678", False)
+    ]
+
+
+def test_create_role_result_can_be_assigned_and_reused():
+    program = parse_script(
+        'var helper_role.role.id = None; '
+        'set helper_role = @create_role("Helpers", "#5865F2"); '
+        '@add_role("123456789012345678", helper_role);'
+    )
+    assert program[0].name == "helper_role"
+    assert program[0].value is None
+    assert program[1] == DiscordAction(
+        "create_role", ("Helpers", "#5865F2"), "helper_role"
+    )
+    assert program[2] == DiscordAction(
+        "give_role", ("123456789012345678", "__EXE_VAR_helper_role__")
+    )
+
+
+def test_create_role_result_assignment_requires_declared_variable():
+    with pytest.raises(ScriptError, match="declare 'helper_role'"):
+        parse_script('set helper_role = @create_role("Helpers"); @send("done");')
