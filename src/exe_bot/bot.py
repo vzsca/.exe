@@ -17,22 +17,16 @@ from .storage import Database, StorageError
 log = logging.getLogger(__name__)
 
 HELP_TEXT = (
-    'Run: !exe send("Hello")\n'
-    'Show help: !exe send(f"help") or !help_exe\n'
-    'Create and save: !exe create greeting :: send("Hello")\n'
-    'List scripts: !exe list\n'
-    'Run / delete saved: !exe run greeting / !exe delete greeting\n'
-    'Standard: let greeting = "Hello"; send(greeting)\n'
-    'Compact: v(greeting, "Hello"); m(greeting)\n'
-    'Condition: if greeting == "Hello": send("yes"); optional next line: else: send("no")\n'
-    'Compact condition: I(greeting, "Hello", m("yes")); compact else on next line: E(m("no"))\n'
-    'Repeat: repeat 3: send(greeting) or repeat 3 as i: send(f"{i}") or R(3, m(greeting))\n'
-    'Server actions: ban(id, "reason"), unban(id), kick(id, "reason"), timeout(id, minutes), untimeout(id)\n'
-    'Roles: create_role("name"), give_role(user_id_or_mention, role_id_name_or_mention), remove_role(user_id_or_mention, role_id_name_or_mention), delete_role(id_or_exact_name)\n'
-    'Channels: create_channel("name"), delete_channel(id_or_exact_name)\n'
-    'Read-only lists: send(f"{guilds_roles()}"), send(f"{guilds_members()}"), send(f"{guilds_channels()}"), send(f"{guilds_categories()}")\n'
-    'Member list requires Server Members Intent; output is capped at 100 members.\n'
-    'Moderation: slowmode(seconds), clear(count); requires matching Discord permissions and bot role access.\n'
+    'Modern syntax: !exe var greeting.str = "Hello"; @send(greeting)\\n'
+    'Blocks use braces: if (mode == "safe") { @send("allowed"); }\\n'
+    'Repeat: repeat(3) { @send("again"); } or for i in range(0, 5) { @send(f"{i}"); }\\n'
+    'Variables: var count.int = 3; set count = 4\\n'
+    'Input: var username.input{str, "What is your username?"} = ""\\n'
+    'Actions: @ban(user_id, "reason"), @kick(user_id, "reason"), @unban(user_id), @mute(user_id, 10), @unmute(user_id)\\n'
+    'Roles: @create_role("name"), @add_role(user_id, role), @remove_role(user_id, role), @delete_role(id_or_exact_name)\\n'
+    'Channels: @create_channel("name"), @delete_channel(id_or_exact_name), @slowmode(seconds), @clear(count)\\n'
+    'Messages: @send("message"), @send("message", "#channel"), @dm(user_id, "message")\\n'
+    'Legacy let/send syntax remains accepted for compatibility. Only whitelisted users may run scripts; Discord permissions and role hierarchy still apply.\\n'
     'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.'
 )
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
