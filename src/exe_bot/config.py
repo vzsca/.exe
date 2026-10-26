@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 class Settings:
     token: str
     owner_id: int
-    script_timeout_seconds: float = 60.0
-    max_script_actions: int = 20
+    script_timeout_seconds: float = 300.0
+    max_script_actions: int = 1000
     database_path: str = "data/exe.sqlite3"
 
 
@@ -21,8 +21,8 @@ def _positive_float(name: str, default: float) -> float:
         value = float(raw)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be a number") from exc
-    if not 0 < value <= 120:
-        raise RuntimeError(f"{name} must be greater than 0 and at most 120")
+    if not 0 < value <= 300:
+        raise RuntimeError(f"{name} must be greater than 0 and at most 300")
     return value
 
 
@@ -32,8 +32,8 @@ def _positive_int(name: str, default: int) -> int:
         value = int(raw)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be an integer") from exc
-    if not 1 <= value <= 100:
-        raise RuntimeError(f"{name} must be between 1 and 100")
+    if not 1 <= value <= 1000:
+        raise RuntimeError(f"{name} must be between 1 and 1000")
     return value
 
 
@@ -57,7 +57,7 @@ def load_settings() -> Settings:
     return Settings(
         token=token,
         owner_id=owner_id,
-        script_timeout_seconds=_positive_float("SCRIPT_TIMEOUT_SECONDS", 60.0),
-        max_script_actions=_positive_int("MAX_SCRIPT_ACTIONS", 20),
+        script_timeout_seconds=_positive_float("SCRIPT_TIMEOUT_SECONDS", 300.0),
+        max_script_actions=_positive_int("MAX_SCRIPT_ACTIONS", 1000),
         database_path=database_path,
     )
