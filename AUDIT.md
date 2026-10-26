@@ -26,9 +26,9 @@ This is a source-level maintenance audit, not a formal penetration test. Discord
 
 ## Findings
 
-### Medium — Event-handler persistence is not wired into the bot runtime
+### Resolved — Unused event-handler API removed
 
-The SQLite layer retains a persistence table and helper methods for event scripts, but the bot does not expose event registration or dispatch. This is not presented as a supported user feature. The table/API are retained for compatibility with existing local databases; event automation remains out of scope until an end-to-end design and tests are added.
+The bot has no event registration or dispatch workflow, so the unused event-handler methods and table creation for new databases have been removed. Existing databases may retain the legacy table, but the current application does not read or write it. Event automation remains out of scope until an end-to-end design and tests are added.
 
 ### Low — Duplicate CI workflows
 
@@ -61,7 +61,8 @@ The current audit branch addresses the previously identified source-level defect
 - Expression AST depth, node count, integer magnitude, and non-finite float results are bounded.
 - Server Members Intent is opt-in and documented consistently with the `@guilds_members()` feature.
 - The Windows virtual-environment activation path matches the documented `venv` directory.
-- Regression tests cover dynamic conditions, quoted-message normalization, and expression resource bounds.
+- Regression tests cover dynamic conditions, quoted-message normalization, expression resource bounds, and multiple actions inside `if`, `else`, and `repeat` blocks.
+- Unused event-handler persistence methods and table creation for new databases have been removed.
 
 ## Validation status
 
