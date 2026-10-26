@@ -589,9 +589,9 @@ def _parse_one(
         return [*deferred_actions, SendMessage(text_value, channel, role_mentions)]
 
     raise ScriptError(
-        f"Line {line_number}: unknown instruction. Try let name = \"text\", "
-        "send(\"text\"), if name == \"text\": send(\"yes\"), repeat 3: send(\"text\"), "
-        "or compact v(...), m(...), I(...), E(...), R(...)."
+        f"Line {line_number}: unknown instruction. Use typed declarations such as "
+        '"var name.str = \\"text\\";", native calls such as \'@send("text");\', '
+        "and brace-based if/else or repeat blocks. See docu.md for supported syntax."
     )
 
 
