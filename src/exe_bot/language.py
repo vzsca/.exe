@@ -7,6 +7,7 @@ internal instructions. No Python code is evaluated or executed.
 from dataclasses import dataclass
 import ast
 import re
+import random
 
 
 class ScriptError(ValueError):
@@ -80,6 +81,14 @@ _MAX_DEPTH = 4
 
 def _parse_value(source: str, line_number: int, variables: dict[str, object]) -> object:
     source = source.strip()
+    random_call = re.fullmatch(r"randint\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)", source, re.IGNORECASE)
+    if random_call:
+        lower, upper = map(int, random_call.groups())
+        if lower > upper:
+            raise ScriptError(f"Line {line_number}: randint minimum cannot exceed maximum")
+        if lower < -1_000_000_000 or upper > 1_000_000_000:
+            raise ScriptError(f"Line {line_number}: randint bounds must be between -1000000000 and 1000000000")
+        return random.randint(lower, upper)
     indexed = re.fullmatch(rf"({_NAME})\[(.+)\]", source)
     if indexed:
         name, raw_index = indexed.groups()
@@ -300,6 +309,31 @@ def _parse_one(
             raise ScriptError(f"Line {line_number}: if body cannot be empty")
         return [IfEquals(variables[variable_name] == expected, tuple(body))]
 
+    for_match = re.fullmatch(rf"for\s+({_NAME})\s+in\s+range\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*:\s*(.+)", statement)
+    if for_match:
+        loop_name, raw_start, raw_stop, body_source = for_match.groups()
+        start, stop = int(raw_start), int(raw_stop)
+        if abs(start) > 1_000_000 or abs(stop) > 1_000_000:
+            raise ScriptError(f"Line {line_number}: range bounds must be between -1000000 and 1000000")
+        if stop <= start:
+            raise ScriptError(f"Line {line_number}: range stop must be greater than range start")
+        if stop - start > _MAX_REPEAT:
+            raise ScriptError(f"Line {line_number}: range is limited to {_MAX_REPEAT} iterations")
+        expanded: list[Instruction] = []
+        original = variables.get(loop_name, None)
+        had_original = loop_name in variables
+        for loop_value in range(start, stop):
+            variables[loop_name] = loop_value
+            loop_body = _parse_body(body_source.strip(), line_number, variables, depth + 1)
+            if not loop_body:
+                raise ScriptError(f"Line {line_number}: for body cannot be empty")
+            expanded.extend(loop_body)
+        if had_original:
+            variables[loop_name] = original
+        else:
+            variables.pop(loop_name, None)
+        return expanded
+
     loop_match = re.fullmatch(rf"repeat\s+(\d+)\s+as\s+({_NAME})\s*:\s*(.+)", statement)
     if loop_match:
         raw_count, loop_name, body_source = loop_match.groups()
@@ -389,6 +423,16 @@ def _parse_one(
                         chunks.append(str(variables[variable_name][index]))
                     except (ValueError, SyntaxError, KeyError, IndexError, TypeError) as exc:
                         raise ScriptError(f"Line {line_number}: invalid list/dictionary index in f-string") from exc
+                elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Call) and isinstance(value.value.func, ast.Name) and value.value.func.id == "randint":
+                    call = value.value
+                    if len(call.args) != 2 or call.keywords or not all(isinstance(arg, ast.Constant) and isinstance(arg.value, int) and not isinstance(arg.value, bool) for arg in call.args):
+                        raise ScriptError(f"Line {line_number}: randint() in f-strings expects two integer literals")
+                    lower, upper = (arg.value for arg in call.args)
+                    if lower > upper:
+                        raise ScriptError(f"Line {line_number}: randint minimum cannot exceed maximum")
+                    if lower < -1_000_000_000 or upper > 1_000_000_000:
+                        raise ScriptError(f"Line {line_number}: randint bounds must be between -1000000000 and 1000000000")
+                    chunks.append(str(random.randint(lower, upper)))
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Call) and isinstance(value.value.func, ast.Name) and value.value.func.id in {"guilds_roles", "guilds_members", "guilds_channels", "guilds_categories"}:
                     call = value.value
                     if call.args or call.keywords:
@@ -440,6 +484,10 @@ def _parse_one(
 
 def _block_to_compact(header: str, children: list[str], line_no: int) -> str:
     body = "§".join(children)
+    for_match = re.fullmatch(r"for\s+([A-Za-z_][A-Za-z0-9_]{0,31})\s+in\s+range\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)", header)
+    if for_match:
+        loop_name, start, stop = for_match.groups()
+        return f"for {loop_name} in range({start}, {stop}): " + body
     repeat_match = re.fullmatch(r"repeat\s+(\d+)(?:\s+as\s+([A-Za-z_][A-Za-z0-9_]{0,31}))?", header)
     if repeat_match:
         count, loop_name = repeat_match.groups()
@@ -477,6 +525,7 @@ def _normalize_indented_blocks(source: str) -> str:
                 break
             is_block = text.endswith(":") and (
                 re.fullmatch(r"repeat\s+\d+(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]{0,31})?\s*:", text)
+                or re.fullmatch(rf"for\s+{_NAME}\s+in\s+range\(\s*-?\d+\s*,\s*-?\d+\s*\)\s*:", text)
                 or re.fullmatch(rf"if\s+{_NAME}\s*==\s*.+:", text)
                 or text == "else:"
             )
@@ -507,6 +556,7 @@ def _normalize_indented_blocks(source: str) -> str:
         for position, (indent, text, line_no) in enumerate(parsed_lines):
             is_block = text.endswith(":") and (
                 re.fullmatch(r"repeat\s+\d+(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]{0,31})?\s*:", text)
+                or re.fullmatch(rf"for\s+{_NAME}\s+in\s+range\(\s*-?\d+\s*,\s*-?\d+\s*\)\s*:", text)
                 or re.fullmatch(rf"if\s+{_NAME}\s*==\s*.+:", text)
                 or text == "else:"
             )
