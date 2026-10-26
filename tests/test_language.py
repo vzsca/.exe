@@ -309,3 +309,40 @@ def test_create_role_result_can_be_used_in_later_fstring():
     actions = expand_actions(program)
     assert actions[0] == DiscordAction("create_role", ("Helpers", "#5865F2"), "role")
     assert actions[1] == SendMessage("__EXE_VAR_role__", role_mentions=True)
+
+
+@pytest.mark.parametrize(
+    "source, expected_action, expected_type, expected_message",
+    [
+        (
+            'var channel.channel.id = None; set channel = @create_channel("annonces"); @send(f"{channel}");',
+            "create_channel", "channel.id",
+            SendMessage("#__EXE_VAR_channel__", channel_mentions=True),
+        ),
+        (
+            'var category.category.id = None; set category = @create_category("Infos"); @send(category);',
+            "create_category", "category.id", SendMessage("__EXE_VAR_category__"),
+        ),
+    ],
+)
+def test_created_channel_and_category_results_are_typed_and_reusable(
+    source, expected_action, expected_type, expected_message
+):
+    actions = expand_actions(parse_script(source))
+    assert actions[0].name == expected_action
+    assert actions[0].result_variable in {"channel", "category"}
+    assert actions[-1] == expected_message
+
+
+def test_create_channel_result_requires_channel_id_type():
+    with pytest.raises(ScriptError, match="channel.id"):
+        parse_script(
+            'var channel.id = None; set channel = @create_channel("annonces"); @send("ok");'
+        )
+
+
+def test_create_category_result_requires_category_id_type():
+    with pytest.raises(ScriptError, match="category.id"):
+        parse_script(
+            'var category.id = None; set category = @create_category("Infos"); @send("ok");'
+        )
