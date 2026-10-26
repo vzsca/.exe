@@ -1,6 +1,6 @@
 # .exe Terms of Use Template
 
-Last updated: October 25, 2026
+Last updated: October 26, 2026
 
 ## 1. Purpose and acceptance
 
