@@ -1000,6 +1000,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     if len(source) > 8000:
         raise ScriptError("Script is too long (maximum 8000 characters)")
     _validate_modern_surface_syntax(source)
+    declared_source = source
     source = _normalize_modern_syntax(source)
     source = _normalize_indented_blocks(source)
     statements = _split_statements(source)
@@ -1009,7 +1010,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     variables: dict[str, object] = {}
     instructions: list[Instruction] = []
     declared_types: dict[str, str] = {}
-    for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=", source):
+    for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", source):
         declared_types[declaration.group(1)] = declaration.group(2)
