@@ -290,3 +290,21 @@ def test_role_id_type_is_declared_after_variable_name():
 def test_create_role_result_requires_role_id_type():
     with pytest.raises(ScriptError, match="role.id"):
         parse_script('var new_role.id = None; set new_role = @create_role("role");')
+
+
+
+def test_role_id_shorthand_is_supported():
+    program = parse_script('var role.id = None; @send("ready");')
+    assert program[0].name == "role"
+    assert program[0].value is None
+
+
+def test_create_role_result_can_be_used_in_later_fstring():
+    program = parse_script(
+        'var role.id = None; '
+        'set role = @create_role("Helpers", "#5865F2"); '
+        '@send(f"{role}");'
+    )
+    actions = expand_actions(program)
+    assert actions[0] == DiscordAction("create_role", ("Helpers", "#5865F2"), "role")
+    assert actions[1] == SendMessage("__EXE_VAR_role__", role_mentions=True)
