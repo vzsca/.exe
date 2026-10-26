@@ -198,17 +198,6 @@ def _parse_value(source: str, line_number: int, variables: dict[str, object]) ->
         if lower < -1_000_000_000 or upper > 1_000_000_000:
             raise ScriptError(f"Line {line_number}: randint bounds must be between -1000000000 and 1000000000")
         return random.randint(lower, upper)
-    indexed = re.fullmatch(rf"({_NAME})\[(.+)\]", source)
-    if indexed:
-        name, raw_index = indexed.groups()
-        if name not in variables:
-            raise ScriptError(f"Line {line_number}: unknown variable '{name}'")
-        try:
-            index = ast.literal_eval(raw_index)
-            value = variables[name][index]  # type: ignore[index]
-        except (ValueError, SyntaxError, KeyError, IndexError, TypeError) as exc:
-            raise ScriptError(f"Line {line_number}: invalid list/dictionary index") from exc
-        return value
     if source in {"True", "False", "None"}:
         return {"True": True, "False": False, "None": None}[source]
     if re.fullmatch(_NAME, source):
