@@ -129,8 +129,11 @@ def build_bot(settings: Settings) -> ExeBot:
         if name in {"give_role", "remove_role"}:
             member_id = target_id(args[0])
             raw_role = str(args[1]).strip()
-            role_mention = re.fullmatch(r"<@&(\d+)>", raw_role)
-            role_id = role_mention.group(1) if role_mention else raw_role
+            role_mention = re.fullmatch(r"<@&(\\d+)>", raw_role)
+            at_role_id = re.fullmatch(r"@(\\d+)", raw_role)
+            role_id = role_mention.group(1) if role_mention else (
+                at_role_id.group(1) if at_role_id else raw_role
+            )
             role = guild.get_role(int(role_id)) if role_id.isdigit() else discord.utils.get(guild.roles, name=raw_role)
             if role is None:
                 raise ScriptError("Could not find that role by ID or exact name.")
@@ -240,8 +243,8 @@ def build_bot(settings: Settings) -> ExeBot:
                 permissions=role_permissions,
                 reason=f".exe by {actor.id}",
             )
-            # Return the numeric ID so the role can be passed directly to give_role/remove_role.
-            return str(created_role.id)
+            # The @ID form also lets f-strings turn the new role into a mention.
+            return f"@{created_role.id}"
         elif name == "delete_role":
             raw = str(args[0])
             role = guild.get_role(int(raw)) if raw.isdigit() else discord.utils.get(guild.roles, name=raw)
