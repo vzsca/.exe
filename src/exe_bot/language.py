@@ -931,7 +931,12 @@ def _mask_fstrings(source: str) -> tuple[str, dict[str, str]]:
     i = 0
     slash = chr(92)
     while i < len(source):
-        if i + 1 >= len(source) or source[i] not in ("f", "F") or source[i + 1] not in ("'", '"'):
+        if (
+            i + 1 >= len(source)
+            or source[i] not in ("f", "F")
+            or source[i + 1] not in ("'", '"')
+            or (i > 0 and (source[i - 1].isalnum() or source[i - 1] == "_"))
+        ):
             output.append(source[i])
             i += 1
             continue
@@ -978,6 +983,10 @@ def _mask_fstrings(source: str) -> tuple[str, dict[str, str]]:
             elif char == "}" and depth:
                 depth -= 1
             j += 1
+        if j == len(source) and source[j - 1] != outer:
+            output.append(source[start:j])
+            i = j
+            continue
         token = "__EXE_FSTRING_TOKEN_" + str(len(replacements)) + "__"
         replacements[token] = source[start:j]
         output.append(token)
