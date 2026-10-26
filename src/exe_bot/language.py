@@ -1012,7 +1012,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     declared_types: dict[str, str] = {}
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
-    for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", source):
+    for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
     for line_number, statement in statements:
         else_match = _ELSE_STANDARD.fullmatch(statement) or _ELSE_COMPACT.fullmatch(statement)
