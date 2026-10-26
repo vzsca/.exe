@@ -196,6 +196,8 @@ def _parse_value(source: str, line_number: int, variables: dict[str, object]) ->
         except (ValueError, SyntaxError, KeyError, IndexError, TypeError) as exc:
             raise ScriptError(f"Line {line_number}: invalid list/dictionary index") from exc
         return value
+    if source in {"True", "False", "None"}:
+        return {"True": True, "False": False, "None": None}[source]
     if re.fullmatch(_NAME, source):
         if source not in variables:
             raise ScriptError(f"Line {line_number}: unknown variable '{source}'")
