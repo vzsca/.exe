@@ -733,6 +733,8 @@ def _value_matches_type(value: object, type_name: str) -> bool:
 
 def parse_input_value(raw_value: str, type_name: str) -> object:
     """Parse and validate plain-text Discord input according to its declared type."""
+    if len(raw_value) > 1800:
+        raise ScriptError("Input response is too long (maximum 1800 characters)")
     value = raw_value.strip()
     try:
         if type_name == "str":
