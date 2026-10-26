@@ -670,7 +670,11 @@ def _parse_one(
                     if value.value.id not in variables:
                         raise ScriptError(f"Line {line_number}: unknown variable '{value.value.id}' in f-string")
                     current = variables[value.value.id]
-                    chunks.append(f"__EXE_VAR_{value.value.id}__" if current == "__EXE_PENDING_INPUT__" else str(current))
+                    if current == "__EXE_PENDING_INPUT__" or current is None:
+                        chunks.append(f"__EXE_VAR_{value.value.id}__")
+                        role_mentions = role_mentions or current is None
+                    else:
+                        chunks.append(str(current))
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Subscript) and isinstance(value.value.value, ast.Name):
                     variable_name = value.value.value.id
                     if variable_name not in variables:
@@ -1084,6 +1088,9 @@ def _normalize_modern_syntax(source: str) -> str:
         decl = re.fullmatch(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=\s*(.+)", stripped)
         if decl:
             name, type_name, value = decl.groups()
+            # A short form such as var role.id means variable "role" of type role.id.
+            if type_name == "id" and name in {"user", "channel", "category", "role", "message"}:
+                type_name = f"{name}.id"
             if type_name not in _TYPE_NAMES:
                 if type_name == "id":
                     raise ScriptError(
@@ -1275,7 +1282,10 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     instructions: list[Instruction] = []
     declared_types: dict[str, str] = {}
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=", declared_source):
-        declared_types[declaration.group(1)] = declaration.group(2)
+        declared_name, declared_type = declaration.groups()
+        if declared_type == "id" and declared_name in {"user", "channel", "category", "role", "message"}:
+            declared_type = f"{declared_name}.id"
+        declared_types[declared_name] = declared_type
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
     def validate_declared_types(instruction: Instruction, line_number: int) -> None:
