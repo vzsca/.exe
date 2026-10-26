@@ -180,11 +180,17 @@ class DiscordActionTests(IsolatedAsyncioTestCase):
             ctx, _, bot = make_context(Path(directory) / "db.sqlite3")
             category = SimpleNamespace(id=987, name="Important", delete=AsyncMock())
             ctx.guild.get_channel = lambda channel_id: category if channel_id == 987 else None
+            # Reach the channel-type validation instead of failing the earlier
+            # actor/bot permission checks in this mocked context.
+            ctx.author.guild_permissions.manage_channels = True
+            ctx.guild.me.guild_permissions.manage_channels = True
 
             class FakeTextChannel:
                 pass
 
-            with patch("exe_bot.bot.discord.TextChannel", FakeTextChannel):
+            with patch("exe_bot.bot.discord.Member", FakeMember), patch(
+                "exe_bot.bot.discord.TextChannel", FakeTextChannel
+            ):
                 try:
                     await bot.get_command("exe").callback(
                         ctx, script='@delete_channel("987");'
