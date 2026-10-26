@@ -433,7 +433,13 @@ def build_bot(settings: Settings) -> ExeBot:
                             raise ScriptError("Invalid deferred condition: missing variable name.")
                         if action.variable_name in runtime_variables:
                             runtime_value = runtime_variables[action.variable_name]
-                            matched = isinstance(action.expected, str) and runtime_value == action.expected
+                            expected_value = action.expected
+                            if isinstance(expected_value, str):
+                                for variable_name, variable_value in runtime_variables.items():
+                                    expected_value = expected_value.replace(
+                                        f"__EXE_VAR_{variable_name}__", variable_value
+                                    )
+                            matched = runtime_value == str(expected_value)
                         else:
                             matched = bool(action.matched)
                         branch = action.body if matched else action.else_body
