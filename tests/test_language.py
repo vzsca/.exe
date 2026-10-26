@@ -270,13 +270,13 @@ def test_repeat_block_keeps_all_actions_in_each_iteration():
 
 
 def test_fstring_accepts_nested_create_role_call_with_double_quotes():
-    source = 'var test.int = 10; repeat(3){@send(f"{test}{@create_role("role","#FF0000",administrator:True)}");}'
+    source = 'var test.int = 10; repeat(3){@send(f"{test}{@create_role("role","#FF0000",manage_messages:True)}");}'
     program = parse_script(source)
     actions = expand_actions(program)
     assert len(actions) == 6
     assert all(isinstance(action, DiscordAction) for action in actions[0::2])
     assert all(action.name == "create_role" for action in actions[0::2])
-    assert all(action.arguments == ("role", "#FF0000", "administrator") for action in actions[0::2])
+    assert all(action.arguments == ("role", "#FF0000", "manage_messages") for action in actions[0::2])
     assert all(isinstance(action, SendMessage) for action in actions[1::2])
     assert all(action.role_mentions for action in actions[1::2])
     assert all(action.text.startswith("10__EXE_VAR___exe_result_") for action in actions[1::2])
@@ -309,3 +309,64 @@ def test_create_role_result_can_be_used_in_later_fstring():
     actions = expand_actions(program)
     assert actions[0] == DiscordAction("create_role", ("Helpers", "#5865F2"), "role")
     assert actions[1] == SendMessage("__EXE_VAR_role__", role_mentions=True)
+
+
+@pytest.mark.parametrize(
+    "source, expected_action, expected_type, expected_message",
+    [
+        (
+            'var channel.channel.id = None; set channel = @create_channel("annonces"); @send(f"{channel}");',
+            "create_channel", "channel.id",
+            SendMessage("#__EXE_VAR_channel__", channel_mentions=True),
+        ),
+        (
+            'var category.category.id = None; set category = @create_category("Infos"); @send(category);',
+            "create_category", "category.id", SendMessage("__EXE_VAR_category__"),
+        ),
+    ],
+)
+def test_created_channel_and_category_results_are_typed_and_reusable(
+    source, expected_action, expected_type, expected_message
+):
+    actions = expand_actions(parse_script(source))
+    assert actions[0].name == expected_action
+    assert actions[0].result_variable in {"channel", "category"}
+    assert actions[-1] == expected_message
+
+
+@pytest.mark.parametrize(
+    "source, expected_action, expected_message",
+    [
+        (
+            '@send(f"created {@create_channel("annonces")}");',
+            "create_channel",
+            SendMessage("created #__EXE_VAR___exe_result_0__", role_mentions=True, channel_mentions=True),
+        ),
+        (
+            '@send(f"created {@create_category("Infos")}");',
+            "create_category",
+            SendMessage("created __EXE_VAR___exe_result_0__", role_mentions=True),
+        ),
+    ],
+)
+def test_inline_channel_and_category_creation_can_be_reused_in_fstrings(
+    source, expected_action, expected_message
+):
+    actions = expand_actions(parse_script(source))
+    assert actions[0].name == expected_action
+    assert actions[0].result_variable == "__exe_result_0"
+    assert actions[1] == expected_message
+
+
+def test_create_channel_result_requires_channel_id_type():
+    with pytest.raises(ScriptError, match="channel.id"):
+        parse_script(
+            'var channel.role.id = None; set channel = @create_channel("annonces"); @send("ok");'
+        )
+
+
+def test_create_category_result_requires_category_id_type():
+    with pytest.raises(ScriptError, match="category.id"):
+        parse_script(
+            'var category.role.id = None; set category = @create_category("Infos"); @send("ok");'
+        )

@@ -33,6 +33,7 @@ class SendMessage:
     text: str
     channel: str | None = None
     role_mentions: bool = False
+    channel_mentions: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -467,7 +468,7 @@ def _protect_fstring_expressions(raw_text: str) -> tuple[str, dict[str, str]]:
             raise ScriptError("Empty expression in f-string")
         # Only custom native calls need protection. Ordinary expressions must stay
         # visible to Python's AST so existing variable/index/randint handling works.
-        native_call = re.fullmatch(r"@?\s*create_role\s*\(.*\)", expression, re.DOTALL)
+        native_call = re.fullmatch(r"@?\s*(?:create_role|create_channel|create_category)\s*\(.*\)", expression, re.DOTALL)
         if native_call:
             name = f"__EXE_EXPR_{len(expressions)}__"
             expressions[name] = expression
@@ -478,24 +479,28 @@ def _protect_fstring_expressions(raw_text: str) -> tuple[str, dict[str, str]]:
     return "f" + quote + "".join(output) + quote, expressions
 
 
-def _parse_fstring_create_role(
+def _parse_fstring_discord_action(
     expression: str, line_number: int, variables: dict[str, object]
-) -> tuple[str | int, ...] | None:
-    """Parse the .exe-specific create_role call accepted inside an f-string."""
+) -> tuple[str, tuple[str | int, ...]] | None:
+    """Parse a supported object-creation call embedded in an f-string."""
     call = expression.strip()
     if call.startswith("@"):
         call = call[1:].lstrip()
-    match = re.fullmatch(r"create_role\s*\((.*)\)", call, re.DOTALL)
+    match = re.fullmatch(r"(create_role|create_channel|create_category)\s*\((.*)\)", call, re.DOTALL)
     if not match:
         return None
-    parts = _split_arguments(match.group(1))
-    if not 1 <= len(parts) <= 3:
-        raise ScriptError(f"Line {line_number}: create_role in f-strings expects 1 to 3 arguments")
+    action_name, raw_arguments = match.groups()
+    parts = _split_arguments(raw_arguments)
+    minimum, maximum = _DISCORD_ACTIONS[action_name]
+    if not minimum <= len(parts) <= maximum:
+        raise ScriptError(
+            f"Line {line_number}: {action_name} in f-strings expects {minimum} to {maximum} arguments"
+        )
     arguments: list[str | int] = []
     for index, part in enumerate(parts):
-        # Permission flags use the .exe syntax name:True, e.g. administrator:True.
+        # Role permissions use the .exe syntax name:True, e.g. manage_messages:True.
         permission = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*):\s*(True|False)", part)
-        if permission and index == 2:
+        if action_name == "create_role" and permission and index == 2:
             permission_name, enabled = permission.groups()
             arguments.append(permission_name if enabled == "True" else "")
             continue
@@ -503,10 +508,10 @@ def _parse_fstring_create_role(
             value = ast.literal_eval(part)
         except (ValueError, SyntaxError) as exc:
             raise ScriptError(
-                f"Line {line_number}: create_role arguments in f-strings must be quoted text, integers, or permission flags"
+                f"Line {line_number}: {action_name} arguments in f-strings must be quoted text, integers, or valid role permission flags"
             ) from exc
         if not isinstance(value, (str, int)) or isinstance(value, bool):
-            raise ScriptError(f"Line {line_number}: unsupported create_role argument")
+            raise ScriptError(f"Line {line_number}: unsupported {action_name} argument")
         if isinstance(value, str):
             value = re.sub(
                 r"{([A-Za-z_][A-Za-z0-9_]*)}",
@@ -514,8 +519,7 @@ def _parse_fstring_create_role(
                 value,
             )
         arguments.append(value)
-    return tuple(arguments)
-
+    return action_name, tuple(arguments)
 
 def _parse_one(
     statement: str,
@@ -526,14 +530,17 @@ def _parse_one(
     if depth > _MAX_DEPTH:
         raise ScriptError(f"Line {line_number}: repeat nesting exceeds {_MAX_DEPTH} levels")
 
-    action_assignment = re.fullmatch(rf"set\s+({_NAME})\s*=\s*create_role\((.*)\)", statement)
+    action_assignment = re.fullmatch(
+        rf"set\s+({_NAME})\s*=\s*(create_role|create_channel|create_category)\((.*)\)",
+        statement,
+    )
     if action_assignment:
-        name, raw_arguments = action_assignment.groups()
+        name, action_name, raw_arguments = action_assignment.groups()
         if name not in variables:
             raise ScriptError(f"Line {line_number}: declare '{name}' with a typed variable before assigning a native action result")
-        action = _parse_discord_action(f"create_role({raw_arguments})", line_number, variables)
+        action = _parse_discord_action(f"{action_name}({raw_arguments})", line_number, variables)
         if action is None:
-            raise ScriptError(f"Line {line_number}: invalid create_role assignment")
+            raise ScriptError(f"Line {line_number}: invalid {action_name} assignment")
         return [DiscordAction(action.name, action.arguments, name)]
 
     match = _SET_STANDARD.fullmatch(statement) or _SET_COMPACT.fullmatch(statement)
@@ -651,6 +658,7 @@ def _parse_one(
         raw_text = parts[0].strip()
         is_f_string = raw_text.startswith('f"') or raw_text.startswith("f'")
         role_mentions = is_f_string and "@" in raw_text
+        channel_mentions = False
         deferred_actions: list[DiscordAction] = []
         if is_f_string:
             protected_text, fstring_expressions = _protect_fstring_expressions(raw_text)
@@ -666,15 +674,23 @@ def _parse_one(
                     chunks.append(value.value)
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name) and value.value.id in fstring_expressions:
                     expression = fstring_expressions[value.value.id]
-                    role_arguments = _parse_fstring_create_role(expression, line_number, variables)
-                    if role_arguments is None:
+                    parsed_action = _parse_fstring_discord_action(expression, line_number, variables)
+                    if parsed_action is None:
                         raise ScriptError(f"Line {line_number}: unsupported expression in f-string: {expression}")
+                    action_name, action_arguments = parsed_action
                     result_name = f"__exe_result_{len(deferred_actions)}"
-                    deferred_actions.append(DiscordAction("create_role", role_arguments, result_name))
-                    # A create_role result is an explicit role reference, so resolve it
-                    # to a real Discord role mention when the final message is sent.
-                    role_mentions = True
-                    chunks.append(f"__EXE_VAR_{result_name}__")
+                    deferred_actions.append(DiscordAction(action_name, action_arguments, result_name))
+                    if action_name == "create_role":
+                        # Resolve the returned @ID token to a real role mention.
+                        role_mentions = True
+                        chunks.append(f"__EXE_VAR_{result_name}__")
+                    elif action_name == "create_channel":
+                        # Prefix the returned channel ID so it resolves as <#ID>.
+                        channel_mentions = True
+                        chunks.append(f"#__EXE_VAR_{result_name}__")
+                    else:
+                        # Categories have IDs but cannot be mentioned in Discord.
+                        chunks.append(f"__EXE_VAR_{result_name}__")
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name):
                     if value.value.id not in variables:
                         raise ScriptError(f"Line {line_number}: unknown variable '{value.value.id}' in f-string")
@@ -744,7 +760,7 @@ def _parse_one(
             channel = str(_parse_value(parts[1], line_number, variables)).strip()
             if not channel:
                 raise ScriptError(f"Line {line_number}: target channel cannot be empty")
-        return [*deferred_actions, SendMessage(text_value, channel, role_mentions)]
+        return [*deferred_actions, SendMessage(text_value, channel, role_mentions, channel_mentions)]
 
     raise ScriptError(
         f"Line {line_number}: unknown instruction. Use typed declarations such as "
@@ -1129,7 +1145,7 @@ def _normalize_modern_syntax(source: str) -> str:
                 stripped = f"let {name} = input({question})"
             else:
                 assign = re.fullmatch(r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)", stripped)
-                if assign and not re.fullmatch(r"@?create_role\s*\(.*\)", assign.group(2).strip()):
+                if assign and not re.fullmatch(r"@?(?:create_role|create_channel|create_category)\s*\(.*\)", assign.group(2).strip()):
                     stripped = f"let {assign.group(1)} = {assign.group(2)}"
 
         # Native calls require @ in the new syntax; the runtime registry remains allowlisted.
@@ -1311,10 +1327,16 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
         declared_types[declaration.group(1)] = declaration.group(2)
     def validate_declared_types(instruction: Instruction, line_number: int) -> None:
         if isinstance(instruction, DiscordAction) and instruction.result_variable and not instruction.result_variable.startswith("__exe_result_"):
+            expected_types = {
+                "create_role": "role.id",
+                "create_channel": "channel.id",
+                "create_category": "category.id",
+            }
+            expected_type = expected_types.get(instruction.name)
             declared_type = declared_types.get(instruction.result_variable)
-            if declared_type != "role.id":
+            if expected_type is None or declared_type != expected_type:
                 raise ScriptError(
-                    f"Line {line_number}: the result of create_role must be assigned to a variable declared as 'role.id'"
+                    f"Line {line_number}: the result of {instruction.name} must be assigned to a variable declared as '{expected_type or 'a matching Discord ID type'}'"
                 )
         elif isinstance(instruction, SetVariable) and instruction.name in declared_types:
             declared_type = declared_types[instruction.name]
@@ -1349,14 +1371,28 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
         role_id_names = {
             name for name, type_name in declared_types.items() if type_name == "role.id"
         }
-        parsed = [
-            SendMessage(
-                instruction.text,
+        channel_id_names = {
+            name for name, type_name in declared_types.items() if type_name == "channel.id"
+        }
+        def mark_channel_mentions(instruction: SendMessage) -> SendMessage:
+            text_value = instruction.text
+            for name in channel_id_names:
+                token = f"__EXE_VAR_{name}__"
+                text_value = re.sub(r"(?<!#)" + re.escape(token), "#" + token, text_value)
+            return SendMessage(
+                text_value,
                 instruction.channel,
-                True,
+                instruction.role_mentions or any(
+                    f"__EXE_VAR_{name}__" in text_value for name in role_id_names
+                ),
+                instruction.channel_mentions or any(
+                    f"#__EXE_VAR_{name}__" in text_value for name in channel_id_names
+                ),
             )
+
+        parsed = [
+            mark_channel_mentions(instruction)
             if isinstance(instruction, SendMessage)
-            and any(f"__EXE_VAR_{name}__" in instruction.text for name in role_id_names)
             else instruction
             for instruction in parsed
         ]
