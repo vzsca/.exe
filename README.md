@@ -12,7 +12,7 @@ La documentation du langage est dans **[`docu.md`](docu.md)**. Les exemples de c
 var greeting.str = "Hello";
 var count.int = 3;
 
-if (count >= 3) {
+if (count == 3) {
     @send(f"{greeting}: {count}");
 } else {
     @send("Not enough");
