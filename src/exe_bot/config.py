@@ -13,6 +13,7 @@ class Settings:
     script_timeout_seconds: float = 300.0
     max_script_actions: int = 1000
     database_path: str = "data/exe.sqlite3"
+    enable_members_intent: bool = False
 
 
 def _positive_float(name: str, default: float) -> float:
@@ -35,6 +36,15 @@ def _positive_int(name: str, default: int) -> int:
     if not 1 <= value <= 1000:
         raise RuntimeError(f"{name} must be between 1 and 1000")
     return value
+
+
+def _boolean(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name, str(default)).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"{name} must be a boolean (true/false)")
 
 
 def load_settings() -> Settings:
@@ -60,4 +70,5 @@ def load_settings() -> Settings:
         script_timeout_seconds=_positive_float("SCRIPT_TIMEOUT_SECONDS", 300.0),
         max_script_actions=_positive_int("MAX_SCRIPT_ACTIONS", 1000),
         database_path=database_path,
+        enable_members_intent=_boolean("ENABLE_MEMBERS_INTENT", False),
     )

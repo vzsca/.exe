@@ -10,13 +10,13 @@ import discord
 from discord.ext import commands
 
 from .config import Settings
-from .language import DiscordAction, InputVariable, ScriptError, SendMessage, expand_actions, parse_script
+from .language import DiscordAction, IfEquals, InputVariable, Instruction, ScriptError, SendMessage, expand_actions, parse_script
 from .permissions import is_owner, may_run_scripts
 from .storage import Database, StorageError
 
 log = logging.getLogger(__name__)
 
-HELP_TEXT = "\\n".join([
+HELP_TEXT = "\n".join([
     'Modern .exe syntax: var greeting.str = "Hello"; @send(greeting);',
     'Every instruction ends with a semicolon. Newlines are optional after semicolons.',
     'Blocks use braces: if (mode == "safe") { @send("allowed"); }',
@@ -48,7 +48,7 @@ class ExeBot(commands.Bot):
     def __init__(self, settings: Settings) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
-        intents.members = True
+        intents.members = settings.enable_members_intent
         super().__init__(command_prefix="!", intents=intents, help_command=None)
         self.settings = settings
         self.db = Database(settings.database_path)
@@ -410,20 +410,41 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.reply(f"Syntax error: {exc}", mention_author=False)
             return False
 
-        current_action = {"index": 0, "name": "not started"}
+        current_action = {"index": 0, "name": "not started", "completed": 0}
         runtime_variables: dict[str, str] = {}
         log.info(".exe script parsed: %d actions (channel=%s actor=%s timeout=%ss)",
                  len(actions), ctx.channel.id, ctx.author.id, settings.script_timeout_seconds)
 
-        async def execute_actions() -> None:
-            for index, action in enumerate(actions, start=1):
-                action_name = "input" if isinstance(action, InputVariable) else ("send" if isinstance(action, SendMessage) else action.name)
+        async def execute_actions(action_list: list[Instruction] = actions) -> None:
+            for index, action in enumerate(action_list, start=1):
+                action_name = (
+                    "input" if isinstance(action, InputVariable)
+                    else "send" if isinstance(action, SendMessage)
+                    else "if" if isinstance(action, IfEquals)
+                    else action.name
+                )
                 current_action.update(index=index, name=action_name)
                 started = time.monotonic()
                 log.info(".exe action %d/%d starting: %s (channel=%s actor=%s)",
                          index, len(actions), action_name, ctx.channel.id, ctx.author.id)
                 try:
-                    if isinstance(action, InputVariable):
+                    if isinstance(action, IfEquals):
+                        if action.variable_name is None:
+                            raise ScriptError("Invalid deferred condition: missing variable name.")
+                        if action.variable_name in runtime_variables:
+                            runtime_value = runtime_variables[action.variable_name]
+                            expected_value = action.expected
+                            if isinstance(expected_value, str):
+                                for variable_name, variable_value in runtime_variables.items():
+                                    expected_value = expected_value.replace(
+                                        f"__EXE_VAR_{variable_name}__", variable_value
+                                    )
+                            matched = runtime_value == str(expected_value)
+                        else:
+                            matched = bool(action.matched)
+                        branch = action.body if matched else action.else_body
+                        await execute_actions(expand_actions(list(branch)))
+                    elif isinstance(action, InputVariable):
                         await ctx.channel.send(action.question)
                         def check(message: discord.Message) -> bool:
                             return message.author.id == ctx.author.id and message.channel.id == ctx.channel.id and not message.author.bot
@@ -434,7 +455,7 @@ def build_bot(settings: Settings) -> ExeBot:
                         if len(answer.content) > 1800:
                             raise ScriptError("Input response is too long (maximum 1800 characters).")
                         # User input is plain text and must never trigger role pings.
-                        runtime_variables[action.name] = answer.content.replace("@", "@\u200b")
+                        runtime_variables[action.name] = answer.content
                     elif isinstance(action, SendMessage):
                         target = ctx.channel
                         if action.channel is not None:
@@ -447,7 +468,9 @@ def build_bot(settings: Settings) -> ExeBot:
                                 raise ScriptError("Could not find the target text channel by ID or exact name.")
                         content = action.text
                         for variable_name, variable_value in runtime_variables.items():
-                            content = content.replace(f"__EXE_VAR_{variable_name}__", variable_value)
+                            # Keep input values intact for comparisons, but neutralize mentions at send time.
+                            safe_value = variable_value.replace("@", "@\u200b")
+                            content = content.replace(f"__EXE_VAR_{variable_name}__", safe_value)
                         allowed_roles = []
                         if action.role_mentions:
                             if ctx.guild is None:
@@ -499,6 +522,8 @@ def build_bot(settings: Settings) -> ExeBot:
                                 f"Discord refused '{action.name}'. Verify the bot's permissions and role hierarchy. "
                                 "Check the bot logs for details."
                             ) from exc
+                    if isinstance(action, (InputVariable, SendMessage, DiscordAction)):
+                        current_action["completed"] = int(current_action["completed"]) + 1
                 finally:
                     log.info(".exe action %d/%d finished: %s (elapsed=%.2fs, channel=%s actor=%s)",
                              index, len(actions), action_name, time.monotonic() - started,
@@ -509,10 +534,17 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.message.add_reaction("✅")
             return True
         except TimeoutError:
-            log.warning(".exe script timed out after %ss at action %s/%s (channel=%s actor=%s)",
-                        settings.script_timeout_seconds, current_action["index"], len(actions),
-                        ctx.channel.id, ctx.author.id)
-            await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
+            log.warning(
+                ".exe script timed out after %ss at action %s/%s; completed=%s (channel=%s actor=%s)",
+                settings.script_timeout_seconds, current_action["index"], len(actions),
+                current_action["completed"], ctx.channel.id, ctx.author.id,
+            )
+            await ctx.reply(
+                "Script stopped: execution time limit reached. "
+                f"{current_action['completed']} action(s) completed before the timeout; "
+                "completed Discord changes cannot be rolled back automatically.",
+                mention_author=False,
+            )
         except ScriptError as exc:
             await ctx.reply(f"Action refused: {exc}", mention_author=False)
         except discord.Forbidden as exc:
@@ -528,8 +560,19 @@ def build_bot(settings: Settings) -> ExeBot:
                 "details were written to the bot log.",
                 mention_author=False,
             )
-        except discord.HTTPException:
-            await ctx.reply("Discord rejected an action in this script.", mention_author=False)
+        except discord.HTTPException as exc:
+            log.warning(
+                ".exe script received Discord HTTP error at action %s/%s (channel=%s actor=%s): %s",
+                current_action["index"], len(actions), ctx.channel.id, ctx.author.id,
+                getattr(exc, "text", str(exc)),
+            )
+            await ctx.reply("Discord rejected an action in this script; details were written to the bot log.", mention_author=False)
+        except Exception:
+            log.exception(
+                ".exe script failed unexpectedly at action %s/%s (channel=%s actor=%s)",
+                current_action["index"], len(actions), ctx.channel.id, ctx.author.id,
+            )
+            await ctx.reply("Script failed unexpectedly; details were written to the bot log.", mention_author=False)
         return False
 
     @bot.command(name="exe")

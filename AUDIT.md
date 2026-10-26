@@ -28,9 +28,7 @@ This is a source-level maintenance audit, not a formal penetration test. Discord
 
 ### Medium — Event-handler persistence is not wired into the bot runtime
 
-The SQLite layer creates an `event_handlers` table and exposes methods to save, retrieve, list, and delete event scripts. Repository search found these methods used by storage tests but not by the Discord bot's command or event-dispatch code. As a result, these records are currently persistence primitives, not an end-to-end event automation feature. The README and language reference do not advertise automatic event handlers as a supported feature.
-
-**Recommendation:** either implement and test the event registration/dispatch workflow, or remove the unused table/API until that feature is ready.
+The SQLite layer retains a persistence table and helper methods for event scripts, but the bot does not expose event registration or dispatch. This is not presented as a supported user feature. The table/API are retained for compatibility with existing local databases; event automation remains out of scope until an end-to-end design and tests are added.
 
 ### Low — Duplicate CI workflows
 
@@ -54,9 +52,20 @@ The parser's fallback error message suggested legacy forms such as `let` and com
 
 No claim of complete security or GDPR compliance is made by this audit. Operators should review the permission list and test the bot in a private server before production use.
 
+## Follow-up fixes
+
+The current audit branch addresses the previously identified source-level defects:
+
+- Conditions depending on user input are deferred to runtime rather than compared against a parser placeholder.
+- Native-call and alias normalization no longer rewrites text inside quoted strings.
+- Expression AST depth, node count, integer magnitude, and non-finite float results are bounded.
+- Server Members Intent is opt-in and documented consistently with the `@guilds_members()` feature.
+- The Windows virtual-environment activation path matches the documented `venv` directory.
+- Regression tests cover dynamic conditions, quoted-message normalization, and expression resource bounds.
+
 ## Validation status
 
-The GitHub Actions workflows completed successfully for the code/documentation changes at commit `a5f4694e20202d5070c608ff517aaeaff95be636`. The remaining test workflow was triggered again after removing the duplicate workflow; check the Actions page for the latest run status.
+The fixes are committed to the audit branch. They still require the repository's CI workflow to run; do not treat this source-level update as proof that all tests pass until GitHub Actions reports success.
 
 ## Files reviewed or updated
 
