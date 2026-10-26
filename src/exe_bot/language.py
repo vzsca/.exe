@@ -324,23 +324,25 @@ def _parse_one(
             raise ScriptError(f"Line {line_number}: repeat body cannot be empty")
         return [Repeat(count, tuple(body))]
 
-    # Allow a freshly created role to be passed directly to give_role/remove_role.
-    role_assignment = re.fullmatch(r"(give_role|remove_role)\((.*)\)", statement)
+    # Resolve create_role(...) as the second argument without evaluating it as Python.
+    # Match the nested call explicitly; the ordinary argument parser only accepts literals.
+    role_assignment = re.fullmatch(
+        r"(give_role|remove_role)\(\s*(.*?)\s*,\s*(create_role\s*\(.*\))\s*\)",
+        statement,
+    )
     if role_assignment:
-        action_name, raw_arguments = role_assignment.groups()
-        parts = _split_arguments(raw_arguments)
-        if len(parts) == 2 and re.match(r"^create_role\s*\(", parts[1]):
-            member_action = _parse_discord_action(f"unban({parts[0]})", line_number, variables)
-            if member_action is None:
-                raise ScriptError(f"Line {line_number}: invalid member argument")
-            created_role = _parse_discord_action(parts[1], line_number, variables)
-            if created_role is None or created_role.name != "create_role":
-                raise ScriptError(f"Line {line_number}: expected create_role(...) as the role argument")
-            result_name = "__exe_result_0"
-            return [
-                DiscordAction("create_role", created_role.arguments, result_name),
-                DiscordAction(action_name, (member_action.arguments[0], f"__EXE_VAR_{result_name}__")),
-            ]
+        action_name, raw_member, raw_role = role_assignment.groups()
+        member_action = _parse_discord_action(f"unban({raw_member})", line_number, variables)
+        if member_action is None:
+            raise ScriptError(f"Line {line_number}: invalid member argument")
+        created_role = _parse_discord_action(raw_role, line_number, variables)
+        if created_role is None or created_role.name != "create_role":
+            raise ScriptError(f"Line {line_number}: expected create_role(...) as the role argument")
+        result_name = "__exe_result_0"
+        return [
+            DiscordAction("create_role", created_role.arguments, result_name),
+            DiscordAction(action_name, (member_action.arguments[0], f"__EXE_VAR_{result_name}__")),
+        ]
 
     action = _parse_discord_action(statement, line_number, variables)
     if action is not None:
