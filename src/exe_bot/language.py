@@ -79,6 +79,96 @@ _MAX_REPEAT = 10
 _MAX_DEPTH = 4
 
 
+
+_ALLOWED_BINOPS = {
+    ast.Add: lambda left, right: left + right,
+    ast.Sub: lambda left, right: left - right,
+    ast.Mult: lambda left, right: left * right,
+    ast.Div: lambda left, right: left / right,
+    ast.FloorDiv: lambda left, right: left // right,
+    ast.Mod: lambda left, right: left % right,
+}
+_ALLOWED_UNARYOPS = {
+    ast.UAdd: lambda value: +value,
+    ast.USub: lambda value: -value,
+    ast.Not: lambda value: not value,
+}
+_ALLOWED_COMPAREOPS = {
+    ast.Eq: lambda left, right: left == right,
+    ast.NotEq: lambda left, right: left != right,
+    ast.Lt: lambda left, right: left < right,
+    ast.LtE: lambda left, right: left <= right,
+    ast.Gt: lambda left, right: left > right,
+    ast.GtE: lambda left, right: left >= right,
+}
+
+
+def _eval_expression(node: ast.AST, variables: dict[str, object]) -> object:
+    """Evaluate a deliberately small expression AST; never call eval/exec."""
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (str, int, float, bool)) or node.value is None:
+            return node.value
+        raise ValueError("unsupported constant")
+    if isinstance(node, ast.Name):
+        if node.id not in variables:
+            raise ValueError(f"unknown variable '{node.id}'")
+        return variables[node.id]
+    if isinstance(node, (ast.List, ast.Tuple)):
+        values = [_eval_expression(item, variables) for item in node.elts]
+        if len(values) > 100:
+            raise ValueError("collections are limited to 100 items")
+        return values if isinstance(node, ast.List) else tuple(values)
+    if isinstance(node, ast.Dict):
+        if len(node.keys) > 100:
+            raise ValueError("collections are limited to 100 items")
+        return {
+            _eval_expression(key, variables): _eval_expression(value, variables)
+            for key, value in zip(node.keys, node.values)
+        }
+    if isinstance(node, ast.BinOp) and type(node.op) in _ALLOWED_BINOPS:
+        left = _eval_expression(node.left, variables)
+        right = _eval_expression(node.right, variables)
+        if isinstance(node.op, ast.Mult) and (
+            (isinstance(left, (str, list, tuple)) and isinstance(right, int) and right > 1000)
+            or (isinstance(right, (str, list, tuple)) and isinstance(left, int) and left > 1000)
+        ):
+            raise ValueError("repetition result is too large")
+        result = _ALLOWED_BINOPS[type(node.op)](left, right)
+        if isinstance(result, (str, list, tuple)) and len(result) > 1800:
+            raise ValueError("expression result is too large")
+        return result
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _ALLOWED_UNARYOPS:
+        return _ALLOWED_UNARYOPS[type(node.op)](_eval_expression(node.operand, variables))
+    if isinstance(node, ast.BoolOp) and isinstance(node.op, (ast.And, ast.Or)):
+        values = [_eval_expression(item, variables) for item in node.values]
+        return all(values) if isinstance(node.op, ast.And) else any(values)
+    if isinstance(node, ast.Compare):
+        left = _eval_expression(node.left, variables)
+        for operator, comparator in zip(node.ops, node.comparators):
+            if type(operator) not in _ALLOWED_COMPAREOPS:
+                raise ValueError("unsupported comparison")
+            right = _eval_expression(comparator, variables)
+            if not _ALLOWED_COMPAREOPS[type(operator)](left, right):
+                return False
+            left = right
+        return True
+    if isinstance(node, ast.Subscript):
+        value = _eval_expression(node.value, variables)
+        index = _eval_expression(node.slice, variables)
+        if not isinstance(value, (list, tuple, str, dict)):
+            raise ValueError("indexing is only supported for strings, lists, tuples, and dictionaries")
+        return value[index]
+    raise ValueError("unsupported expression")
+
+
+def _safe_expression(source: str, variables: dict[str, object]) -> object:
+    try:
+        parsed = ast.parse(source, mode="eval")
+        return _eval_expression(parsed.body, variables)
+    except (SyntaxError, ValueError, TypeError, ZeroDivisionError, OverflowError, KeyError, IndexError) as exc:
+        raise ValueError(str(exc) or "invalid expression") from exc
+
+
 def _parse_value(source: str, line_number: int, variables: dict[str, object]) -> object:
     source = source.strip()
     random_call = re.fullmatch(r"randint\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)", source, re.IGNORECASE)
@@ -105,9 +195,9 @@ def _parse_value(source: str, line_number: int, variables: dict[str, object]) ->
             raise ScriptError(f"Line {line_number}: unknown variable '{source}'")
         return variables[source]
     try:
-        value = ast.literal_eval(source)
-    except (ValueError, SyntaxError) as exc:
-        raise ScriptError(f"Line {line_number}: expected a string, number, list, dictionary, or defined variable") from exc
+        value = _safe_expression(source, variables)
+    except ValueError as exc:
+        raise ScriptError(f"Line {line_number}: invalid or unsupported expression: {exc}") from exc
     if not isinstance(value, (str, int, float, bool, list, dict, tuple)) and value is not None:
         raise ScriptError(f"Line {line_number}: unsupported value type")
     if isinstance(value, (list, tuple, dict)) and len(value) > 100:
