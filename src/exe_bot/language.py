@@ -410,6 +410,107 @@ def _parse_discord_action(statement: str, line_number: int, variables: dict[str,
     return DiscordAction(name, tuple(arguments))
 
 
+def _protect_fstring_expressions(raw_text: str) -> tuple[str, dict[str, str]]:
+    """Replace f-string expressions with safe names before parsing the outer string.
+
+    This lets .exe accept nested quoted arguments such as
+    f"{value}{@create_role("name", "#5865F2")}" without asking Python's
+    f-string parser to parse the .exe-specific native-call syntax.
+    """
+    if len(raw_text) < 3 or raw_text[1] not in ("'", '"'):
+        return raw_text, {}
+    quote = raw_text[1]
+    if raw_text[-1] != quote:
+        return raw_text, {}
+    content = raw_text[2:-1]
+    output: list[str] = []
+    expressions: dict[str, str] = {}
+    i = 0
+    while i < len(content):
+        if content.startswith("{{", i) or content.startswith("}}", i):
+            output.append(content[i:i + 2])
+            i += 2
+            continue
+        if content[i] != "{":
+            output.append(content[i])
+            i += 1
+            continue
+        start = i + 1
+        j = start
+        nested = 0
+        inner_quote: str | None = None
+        escaped = False
+        while j < len(content):
+            char = content[j]
+            if escaped:
+                escaped = False
+            elif char == "\\" and inner_quote:
+                escaped = True
+            elif inner_quote:
+                if char == inner_quote:
+                    inner_quote = None
+            elif char in ("'", '"'):
+                inner_quote = char
+            elif char in "([{":
+                nested += 1
+            elif char in ")]":
+                nested = max(0, nested - 1)
+            elif char == "}" and nested == 0:
+                break
+            elif char == "}":
+                nested = max(0, nested - 1)
+            j += 1
+        if j >= len(content):
+            raise ScriptError("Unclosed expression in f-string")
+        expression = content[start:j].strip()
+        if not expression:
+            raise ScriptError("Empty expression in f-string")
+        name = f"__EXE_EXPR_{len(expressions)}__"
+        expressions[name] = expression
+        output.append("{" + name + "}")
+        i = j + 1
+    return "f" + quote + "".join(output) + quote, expressions
+
+
+def _parse_fstring_create_role(
+    expression: str, line_number: int, variables: dict[str, object]
+) -> tuple[str | int, ...] | None:
+    """Parse the .exe-specific create_role call accepted inside an f-string."""
+    call = expression.strip()
+    if call.startswith("@"):
+        call = call[1:].lstrip()
+    match = re.fullmatch(r"create_role\s*\((.*)\)", call, re.DOTALL)
+    if not match:
+        return None
+    parts = _split_arguments(match.group(1))
+    if not 1 <= len(parts) <= 3:
+        raise ScriptError(f"Line {line_number}: create_role in f-strings expects 1 to 3 arguments")
+    arguments: list[str | int] = []
+    for index, part in enumerate(parts):
+        # Permission flags use the .exe syntax name:True, e.g. administrator:True.
+        permission = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*):\s*(True|False)", part)
+        if permission and index == 2:
+            permission_name, enabled = permission.groups()
+            arguments.append(permission_name if enabled == "True" else "")
+            continue
+        try:
+            value = ast.literal_eval(part)
+        except (ValueError, SyntaxError) as exc:
+            raise ScriptError(
+                f"Line {line_number}: create_role arguments in f-strings must be quoted text, integers, or permission flags"
+            ) from exc
+        if not isinstance(value, (str, int)) or isinstance(value, bool):
+            raise ScriptError(f"Line {line_number}: unsupported create_role argument")
+        if isinstance(value, str):
+            value = re.sub(
+                r"{([A-Za-z_][A-Za-z0-9_]*)}",
+                lambda m: str(variables[m.group(1)]) if m.group(1) in variables else m.group(0),
+                value,
+            )
+        arguments.append(value)
+    return tuple(arguments)
+
+
 def _parse_one(
     statement: str,
     line_number: int,
@@ -546,8 +647,9 @@ def _parse_one(
         role_mentions = is_f_string and "@" in raw_text
         deferred_actions: list[DiscordAction] = []
         if is_f_string:
+            protected_text, fstring_expressions = _protect_fstring_expressions(raw_text)
             try:
-                parsed = ast.parse(raw_text, mode="eval").body
+                parsed = ast.parse(protected_text, mode="eval").body
             except SyntaxError as exc:
                 raise ScriptError(f"Line {line_number}: invalid f-string") from exc
             if not isinstance(parsed, ast.JoinedStr):
@@ -556,6 +658,14 @@ def _parse_one(
             for value in parsed.values:
                 if isinstance(value, ast.Constant) and isinstance(value.value, str):
                     chunks.append(value.value)
+                elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name) and value.value.id in fstring_expressions:
+                    expression = fstring_expressions[value.value.id]
+                    role_arguments = _parse_fstring_create_role(expression, line_number, variables)
+                    if role_arguments is None:
+                        raise ScriptError(f"Line {line_number}: unsupported expression in f-string: {expression}")
+                    result_name = f"__exe_result_{len(deferred_actions)}"
+                    deferred_actions.append(DiscordAction("create_role", role_arguments, result_name))
+                    chunks.append(f"__EXE_VAR_{result_name}__")
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name):
                     if value.value.id not in variables:
                         raise ScriptError(f"Line {line_number}: unknown variable '{value.value.id}' in f-string")
