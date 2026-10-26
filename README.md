@@ -44,12 +44,12 @@ Clone the repository and create a virtual environment:
 
     git clone https://github.com/vzsca/.exe.git
     cd .exe
-    python -m venv .venv
+    python -m venv venv
 
 Activate it:
 
     # Linux / macOS
-    source .venv/bin/activate
+    source venv/bin/activate
 
     # Windows PowerShell
     .venv\Scripts\Activate.ps1
@@ -86,11 +86,11 @@ All commands use the ! prefix.
 
 | Command | Purpose |
 |---|---|
-| !exe <script> | Validate and run a script immediately. |
-| !exe create <name> :: <script> | Validate and save a named script without running it. |
+| !exe &lt;script&gt; | Validate and run a script immediately. |
+| !exe create &lt;name&gt; :: &lt;script&gt; | Validate and save a named script without running it. |
 | !exe list | List your saved scripts. |
-| !exe run <name> | Run one of your saved scripts. |
-| !exe delete <name> | Delete one of your saved scripts. |
+| !exe run &lt;name&gt; | Run one of your saved scripts. |
+| !exe delete &lt;name&gt; | Delete one of your saved scripts. |
 | !exe admin add @user | Add a user to the execution whitelist (owner only). |
 | !exe admin remove @user | Remove a user from the execution whitelist (owner only). |
 | !exe admin list | List whitelisted user IDs (owner only). |
