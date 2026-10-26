@@ -65,13 +65,13 @@ def running_process():
 
 def start() -> None:
     if running_process():
-        print("Bot déjà démarré.")
+        print("Bot is already running.")
         return
     if not PYTHON.exists():
-        print("[ERREUR] Environnement Python absent. Lance start_bot.bat ou start_bot.sh.")
+        print("[ERROR] Python environment not found. Run start_bot.bat or start_bot.sh first.")
         return
     if not ENV_PATH.exists() or not read_env().get("DISCORD_TOKEN") or not read_env().get("OWNER_ID"):
-        print("[ERREUR] Configure d'abord le token et l'owner avec set_token et set_owner.")
+        print("[ERROR] Configure the token and owner first with set_token and set_owner.")
         return
     LOG_PATH.touch(exist_ok=True)
     env = os.environ.copy()
@@ -89,17 +89,17 @@ def start() -> None:
         if child.is_running() and child.status() != psutil.STATUS_ZOMBIE:
             PID_PATH.write_text(str(proc.pid), encoding="utf-8")
             START_PATH.write_text(str(child.create_time()), encoding="utf-8")
-            print(f"Bot démarré (PID {proc.pid}). Logs : bot.log")
+            print(f"Bot started (PID {proc.pid}). Logs: bot.log")
         else:
-            print("Le bot s'est arrêté au démarrage. Consulte bot.log.")
+            print("The bot exited during startup. Check bot.log.")
     except (OSError, psutil.Error) as exc:
-        print(f"[ERREUR] Démarrage impossible : {exc}")
+        print(f"[ERROR] Could not start the bot: {exc}")
 
 
 def stop() -> None:
     proc = running_process()
     if proc is None:
-        print("Le bot n'est pas démarré.")
+        print("The bot is not running.")
         return
     try:
         for child in proc.children(recursive=True):
@@ -109,9 +109,9 @@ def stop() -> None:
             proc.wait(timeout=5)
         except psutil.TimeoutExpired:
             proc.kill()
-        print("Bot arrêté.")
+        print("Bot stopped.")
     except psutil.Error as exc:
-        print(f"[ERREUR] Arrêt impossible : {exc}")
+        print(f"[ERROR] Could not stop the bot: {exc}")
     finally:
         PID_PATH.unlink(missing_ok=True)
         START_PATH.unlink(missing_ok=True)
@@ -120,7 +120,7 @@ def stop() -> None:
 def uptime() -> None:
     proc = running_process()
     if proc is None:
-        print("Bot arrêté — uptime : 0.")
+        print("Bot stopped — uptime: 0.")
         return
     seconds = max(0, int(time.time() - proc.create_time()))
     days, rem = divmod(seconds, 86400)
@@ -132,41 +132,41 @@ def uptime() -> None:
 def status() -> None:
     proc = running_process()
     if proc is None:
-        print("État : ARRÊTÉ")
+        print("Status: STOPPED")
     else:
-        print(f"État : ACTIF | PID {proc.pid} | RAM {proc.memory_info().rss / 1048576:.1f} Mo")
+        print(f"Status: RUNNING | PID {proc.pid} | RAM {proc.memory_info().rss / 1048576:.1f} MB")
         uptime()
 
 
 def configure_token() -> None:
-    value = getpass.getpass("Nouveau token Discord (saisie masquée) : ").strip()
+    value = getpass.getpass("New Discord bot token (hidden input): ").strip()
     if value:
         set_env("DISCORD_TOKEN", value)
-        print("Token enregistré dans .env. Redémarre le bot pour l'appliquer.")
+        print("Token saved to .env. Restart the bot to apply it.")
 
 
 def configure_owner() -> None:
-    value = input("ID Discord numérique du propriétaire : ").strip()
+    value = input("Numeric Discord user ID of the owner: ").strip()
     if not value.isdigit() or int(value) <= 0:
-        print("[ERREUR] L'ID doit contenir uniquement des chiffres.")
+        print("[ERROR] The ID must contain digits only.")
         return
     set_env("OWNER_ID", value)
-    print("Owner enregistré dans .env. Redémarre le bot pour l'appliquer.")
+    print("Owner ID saved to .env. Restart the bot to apply it.")
 
 
 def show_help() -> None:
     print("""
-Commandes du panel .exe
-  start       Démarrer le bot en arrière-plan
-  stop        Arrêter le bot
-  restart     Redémarrer le bot
-  status      État et utilisation RAM
-  uptime      Temps depuis le démarrage
-  set_token   Configurer le token Discord (masqué)
-  set_owner   Configurer l'ID Discord propriétaire
-  logs        Afficher les 30 dernières lignes de bot.log
+.exe Control Panel commands
+  start       Start the bot in the background
+  stop        Stop the bot
+  restart     Restart the bot
+  status      Status and RAM usage
+  uptime      Time since startup
+  set_token   Configure the Discord token (hidden input)
+  set_owner   Configure the owner's Discord ID
+  logs        Show the last 30 lines of bot.log
   help        Afficher cette aide
-  exit        Fermer le panel (le bot reste actif)
+  exit        Close the panel (the bot keeps running)
 """)
 
 
@@ -174,7 +174,7 @@ def main() -> None:
     print("================================")
     print("       .exe Control Panel")
     print("================================")
-    print(f"Python : {sys.version.split()[0]} | Plateforme : {sys.platform}")
+    print(f"Python: {sys.version.split()[0]} | Platform: {sys.platform}")
     show_help()
     actions = {"start": start, "stop": stop, "status": status, "uptime": uptime,
                "set_token": configure_token, "set_owner": configure_owner, "help": show_help}
@@ -193,13 +193,13 @@ def main() -> None:
         elif command == "logs":
             if LOG_PATH.exists():
                 lines = LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines()
-                print("\n".join(lines[-30:]) or "Aucun log.")
+                print("\n".join(lines[-30:]) or "No log entries.")
             else:
-                print("bot.log n'existe pas encore.")
+                print("bot.log does not exist yet.")
         elif command in actions:
             actions[command]()
         elif command:
-            print('Commande inconnue. Tape "help".')
+            print('Unknown command. Type "help".')
 
 
 if __name__ == "__main__":
