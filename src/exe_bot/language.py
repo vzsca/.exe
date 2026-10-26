@@ -410,6 +410,113 @@ def _parse_discord_action(statement: str, line_number: int, variables: dict[str,
     return DiscordAction(name, tuple(arguments))
 
 
+def _protect_fstring_expressions(raw_text: str) -> tuple[str, dict[str, str]]:
+    """Replace f-string expressions with safe names before parsing the outer string.
+
+    This lets .exe accept nested quoted arguments such as
+    f"{value}{@create_role("name", "#5865F2")}" without asking Python's
+    f-string parser to parse the .exe-specific native-call syntax.
+    """
+    if len(raw_text) < 3 or raw_text[1] not in ("'", '"'):
+        return raw_text, {}
+    quote = raw_text[1]
+    if raw_text[-1] != quote:
+        return raw_text, {}
+    content = raw_text[2:-1]
+    output: list[str] = []
+    expressions: dict[str, str] = {}
+    i = 0
+    while i < len(content):
+        if content.startswith("{{", i) or content.startswith("}}", i):
+            output.append(content[i:i + 2])
+            i += 2
+            continue
+        if content[i] != "{":
+            output.append(content[i])
+            i += 1
+            continue
+        start = i + 1
+        j = start
+        nested = 0
+        inner_quote: str | None = None
+        escaped = False
+        while j < len(content):
+            char = content[j]
+            if escaped:
+                escaped = False
+            elif char == "\\" and inner_quote:
+                escaped = True
+            elif inner_quote:
+                if char == inner_quote:
+                    inner_quote = None
+            elif char in ("'", '"'):
+                inner_quote = char
+            elif char in "([{":
+                nested += 1
+            elif char in ")]":
+                nested = max(0, nested - 1)
+            elif char == "}" and nested == 0:
+                break
+            elif char == "}":
+                nested = max(0, nested - 1)
+            j += 1
+        if j >= len(content):
+            raise ScriptError("Unclosed expression in f-string")
+        expression = content[start:j].strip()
+        if not expression:
+            raise ScriptError("Empty expression in f-string")
+        # Only custom native calls need protection. Ordinary expressions must stay
+        # visible to Python's AST so existing variable/index/randint handling works.
+        native_call = re.fullmatch(r"@?\s*create_role\s*\(.*\)", expression, re.DOTALL)
+        if native_call:
+            name = f"__EXE_EXPR_{len(expressions)}__"
+            expressions[name] = expression
+            output.append("{" + name + "}")
+        else:
+            output.append("{" + expression + "}")
+        i = j + 1
+    return "f" + quote + "".join(output) + quote, expressions
+
+
+def _parse_fstring_create_role(
+    expression: str, line_number: int, variables: dict[str, object]
+) -> tuple[str | int, ...] | None:
+    """Parse the .exe-specific create_role call accepted inside an f-string."""
+    call = expression.strip()
+    if call.startswith("@"):
+        call = call[1:].lstrip()
+    match = re.fullmatch(r"create_role\s*\((.*)\)", call, re.DOTALL)
+    if not match:
+        return None
+    parts = _split_arguments(match.group(1))
+    if not 1 <= len(parts) <= 3:
+        raise ScriptError(f"Line {line_number}: create_role in f-strings expects 1 to 3 arguments")
+    arguments: list[str | int] = []
+    for index, part in enumerate(parts):
+        # Permission flags use the .exe syntax name:True, e.g. administrator:True.
+        permission = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*):\s*(True|False)", part)
+        if permission and index == 2:
+            permission_name, enabled = permission.groups()
+            arguments.append(permission_name if enabled == "True" else "")
+            continue
+        try:
+            value = ast.literal_eval(part)
+        except (ValueError, SyntaxError) as exc:
+            raise ScriptError(
+                f"Line {line_number}: create_role arguments in f-strings must be quoted text, integers, or permission flags"
+            ) from exc
+        if not isinstance(value, (str, int)) or isinstance(value, bool):
+            raise ScriptError(f"Line {line_number}: unsupported create_role argument")
+        if isinstance(value, str):
+            value = re.sub(
+                r"{([A-Za-z_][A-Za-z0-9_]*)}",
+                lambda m: str(variables[m.group(1)]) if m.group(1) in variables else m.group(0),
+                value,
+            )
+        arguments.append(value)
+    return tuple(arguments)
+
+
 def _parse_one(
     statement: str,
     line_number: int,
@@ -546,8 +653,9 @@ def _parse_one(
         role_mentions = is_f_string and "@" in raw_text
         deferred_actions: list[DiscordAction] = []
         if is_f_string:
+            protected_text, fstring_expressions = _protect_fstring_expressions(raw_text)
             try:
-                parsed = ast.parse(raw_text, mode="eval").body
+                parsed = ast.parse(protected_text, mode="eval").body
             except SyntaxError as exc:
                 raise ScriptError(f"Line {line_number}: invalid f-string") from exc
             if not isinstance(parsed, ast.JoinedStr):
@@ -556,11 +664,23 @@ def _parse_one(
             for value in parsed.values:
                 if isinstance(value, ast.Constant) and isinstance(value.value, str):
                     chunks.append(value.value)
+                elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name) and value.value.id in fstring_expressions:
+                    expression = fstring_expressions[value.value.id]
+                    role_arguments = _parse_fstring_create_role(expression, line_number, variables)
+                    if role_arguments is None:
+                        raise ScriptError(f"Line {line_number}: unsupported expression in f-string: {expression}")
+                    result_name = f"__exe_result_{len(deferred_actions)}"
+                    deferred_actions.append(DiscordAction("create_role", role_arguments, result_name))
+                    chunks.append(f"__EXE_VAR_{result_name}__")
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name):
                     if value.value.id not in variables:
                         raise ScriptError(f"Line {line_number}: unknown variable '{value.value.id}' in f-string")
                     current = variables[value.value.id]
-                    chunks.append(f"__EXE_VAR_{value.value.id}__" if current == "__EXE_PENDING_INPUT__" else str(current))
+                    if current == "__EXE_PENDING_INPUT__" or current is None:
+                        chunks.append(f"__EXE_VAR_{value.value.id}__")
+                        role_mentions = role_mentions or current is None
+                    else:
+                        chunks.append(str(current))
                 elif isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Subscript) and isinstance(value.value.value, ast.Name):
                     variable_name = value.value.value.id
                     if variable_name not in variables:
@@ -804,6 +924,76 @@ def _replace_outside_strings(source: str, pattern: str, replacement: str) -> str
     return "".join(output)
 
 
+def _mask_fstrings(source: str) -> tuple[str, dict[str, str]]:
+    """Hide f-string literals during block scanning, including nested quoted expressions."""
+    output = []
+    replacements = {}
+    i = 0
+    slash = chr(92)
+    while i < len(source):
+        if (
+            i + 1 >= len(source)
+            or source[i] not in ("f", "F")
+            or source[i + 1] not in ("'", '"')
+            or (i > 0 and (source[i - 1].isalnum() or source[i - 1] == "_"))
+        ):
+            output.append(source[i])
+            i += 1
+            continue
+        start = i
+        outer = source[i + 1]
+        j = i + 2
+        depth = 0
+        inner = None
+        escaped = False
+        while j < len(source):
+            char = source[j]
+            if inner is not None:
+                if escaped:
+                    escaped = False
+                elif char == slash:
+                    escaped = True
+                elif char == inner:
+                    inner = None
+                j += 1
+                continue
+            if depth and char in ("'", '"'):
+                inner = char
+                j += 1
+                continue
+            if escaped:
+                escaped = False
+                j += 1
+                continue
+            if char == slash:
+                escaped = True
+                j += 1
+                continue
+            if depth == 0 and char == outer:
+                j += 1
+                break
+            if char == "{" and depth == 0 and j + 1 < len(source) and source[j + 1] == "{":
+                j += 2
+                continue
+            if char == "}" and depth == 0 and j + 1 < len(source) and source[j + 1] == "}":
+                j += 2
+                continue
+            if char == "{":
+                depth += 1
+            elif char == "}" and depth:
+                depth -= 1
+            j += 1
+        if j == len(source) and source[j - 1] != outer:
+            output.append(source[start:j])
+            i = j
+            continue
+        token = "__EXE_FSTRING_TOKEN_" + str(len(replacements)) + "__"
+        replacements[token] = source[start:j]
+        output.append(token)
+        i = j
+    return "".join(output), replacements
+
+
 def _normalize_modern_syntax(source: str) -> str:
     """Translate the agreed English, brace-based surface syntax to the legacy AST parser.
 
@@ -812,6 +1002,7 @@ def _normalize_modern_syntax(source: str) -> str:
     """
     # First scan the source to turn top-level semicolons and braces into statement
     # boundaries while leaving quoted strings (including f-strings) untouched.
+    source, fstring_tokens = _mask_fstrings(source)
     lines: list[str] = []
     current: list[str] = []
     quote: str | None = None
@@ -912,7 +1103,14 @@ def _normalize_modern_syntax(source: str) -> str:
         decl = re.fullmatch(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=\s*(.+)", stripped)
         if decl:
             name, type_name, value = decl.groups()
+            # A short form such as var role.id means variable "role" of type role.id.
+            if type_name == "id" and name in {"user", "channel", "category", "role", "message"}:
+                type_name = f"{name}.id"
             if type_name not in _TYPE_NAMES:
+                if type_name == "id":
+                    raise ScriptError(
+                        f"Unknown variable type 'id' for '{name}'. Use a qualified Discord type, e.g. 'var new_role.role.id = None;' for a role reference."
+                    )
                 raise ScriptError(f"Unknown variable type '{type_name}'")
             stripped = f"let {name} = {value}"
         else:
@@ -940,11 +1138,16 @@ def _normalize_modern_syntax(source: str) -> str:
             )
         # The legacy engine uses timeout(minutes) for mute(duration).
         normalized.append(" " * (len(line) - len(line.lstrip())) + stripped)
-    return "\n".join(normalized)
+    result = "\n".join(normalized)
+    for token, original in fstring_tokens.items():
+        result = result.replace(token, original)
+    return result
 
 
 def _validate_modern_surface_syntax(source: str) -> None:
     """Validate statement terminators and reject legacy syntax before normalization."""
+    # Nested quotes inside f-string expressions must not confuse the surface scanner.
+    source, _ = _mask_fstrings(source)
     legacy_patterns = (
         (r"(?<![\w@])\blet\s+", "Legacy 'let' declarations are not supported; use 'var name.type = value;'"),
         (r"(?<![\w@])\bv\s*\(", "Compact syntax v(...) is not supported."),
@@ -1096,7 +1299,10 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     instructions: list[Instruction] = []
     declared_types: dict[str, str] = {}
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=", declared_source):
-        declared_types[declaration.group(1)] = declaration.group(2)
+        declared_name, declared_type = declaration.groups()
+        if declared_type == "id" and declared_name in {"user", "channel", "category", "role", "message"}:
+            declared_type = f"{declared_name}.id"
+        declared_types[declared_name] = declared_type
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
     def validate_declared_types(instruction: Instruction, line_number: int) -> None:
@@ -1136,6 +1342,20 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
             continue
 
         parsed = _parse_one(statement, line_number, variables, 0)
+        role_id_names = {
+            name for name, type_name in declared_types.items() if type_name == "role.id"
+        }
+        parsed = [
+            SendMessage(
+                instruction.text,
+                instruction.channel,
+                True,
+            )
+            if isinstance(instruction, SendMessage)
+            and any(f"__EXE_VAR_{name}__" in instruction.text for name in role_id_names)
+            else instruction
+            for instruction in parsed
+        ]
         for instruction in parsed:
             validate_declared_types(instruction, line_number)
             instructions.append(instruction)
