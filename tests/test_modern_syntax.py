@@ -1,0 +1,59 @@
+import pytest
+
+from exe_bot.language import (
+    DiscordAction,
+    InputVariable,
+    SendMessage,
+    ScriptError,
+    expand_actions,
+    parse_script,
+)
+
+
+def test_english_brace_syntax_and_at_send():
+    program = parse_script('var greeting.str = "Hello"; @send(greeting);')
+    assert expand_actions(program) == [SendMessage("Hello")]
+
+
+def test_brace_if_and_repeat_syntax():
+    program = parse_script(
+        'var mode.str = "safe"\n'
+        'if (mode == "safe") {\n'
+        '  @send("allowed");\n'
+        '}\n'
+        'repeat(2) { @send("again"); }'
+    )
+    assert expand_actions(program) == [
+        SendMessage("allowed"),
+        SendMessage("again"),
+        SendMessage("again"),
+    ]
+
+
+def test_english_action_aliases_are_normalized():
+    assert parse_script('@add_role("123456789012345678", "Helpers")') == [
+        DiscordAction("give_role", ("123456789012345678", "Helpers"))
+    ]
+    assert parse_script('@create_chanel("general")') == [
+        DiscordAction("create_channel", ("general",))
+    ]
+
+
+def test_typed_input_declaration_uses_input_instruction():
+    program = parse_script(
+        'var username.input{str, "What is your username?"} = ""\n'
+        '@send(f"Hello {username}!")'
+    )
+    assert isinstance(program[0], InputVariable)
+    assert program[0].name == "username"
+    assert program[0].question == "What is your username?"
+
+
+def test_unknown_declared_type_is_rejected():
+    with pytest.raises(ScriptError, match="Unknown variable type"):
+        parse_script('var value.unknown = "x"\n@send(value)')
+
+
+def test_unclosed_brace_is_rejected():
+    with pytest.raises(ScriptError, match="Unclosed block brace"):
+        parse_script('repeat(2) { @send("x");')
