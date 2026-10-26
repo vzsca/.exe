@@ -118,3 +118,58 @@ class DiscordActionTests(IsolatedAsyncioTestCase):
                     self.assertIn("Discord rejected an action", ctx.reply.await_args.args[0])
                 finally:
                     await bot.close()
+
+
+    async def test_create_role_result_can_be_reused_for_role_assignment(self):
+        with TemporaryDirectory() as directory:
+            ctx, target, bot = make_context(Path(directory) / "db.sqlite3")
+            created_role = FakeRole(31, "Helpers", 4)
+            async def create_role(**kwargs):
+                ctx.guild.roles.append(created_role)
+                return created_role
+            ctx.guild.create_role = AsyncMock(side_effect=create_role)
+            with patch("exe_bot.bot.discord.Member", FakeMember):
+                try:
+                    await bot.get_command("exe").callback(
+                        ctx,
+                        script=(
+                            'var helper_role.role.id = None; '
+                            'set helper_role = @create_role("Helpers"); '
+                            '@add_role("456", helper_role);'
+                        ),
+                    )
+                    ctx.guild.create_role.assert_awaited_once()
+                    target.add_roles.assert_awaited_once_with(
+                        created_role, reason=f".exe by {ctx.author.id}"
+                    )
+                finally:
+                    await bot.close()
+
+    async def test_role_assignment_requires_manage_roles_permission(self):
+        with TemporaryDirectory() as directory:
+            ctx, target, bot = make_context(Path(directory) / "db.sqlite3")
+            ctx.author.guild_permissions.manage_roles = False
+            with patch("exe_bot.bot.discord.Member", FakeMember):
+                try:
+                    await bot.get_command("exe").callback(
+                        ctx, script='@add_role("456", "Helpers");'
+                    )
+                    self.assertIn("Manage Roles", ctx.reply.await_args.args[0])
+                    target.add_roles.assert_not_awaited()
+                finally:
+                    await bot.close()
+
+    async def test_create_role_rejects_administrator_permission(self):
+        with TemporaryDirectory() as directory:
+            ctx, _, bot = make_context(Path(directory) / "db.sqlite3")
+            ctx.guild.create_role = AsyncMock()
+            with patch("exe_bot.bot.discord.Member", FakeMember):
+                try:
+                    await bot.get_command("exe").callback(
+                        ctx,
+                        script='@create_role("Helpers", "#5865F2", "administrator");'
+                    )
+                    self.assertIn("administrator", ctx.reply.await_args.args[0])
+                    ctx.guild.create_role.assert_not_awaited()
+                finally:
+                    await bot.close()
