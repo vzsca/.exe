@@ -706,6 +706,28 @@ def _normalize_indented_blocks(source: str) -> str:
 
 
 _TYPE_NAMES = ("user.id", "channel.id", "category.id", "role.id", "message.id", "str", "int", "float", "bool", "list", "dict", "time")
+
+def _value_matches_type(value: object, type_name: str) -> bool:
+    """Check runtime values against the declared .exe variable type."""
+    if value is None:
+        return type_name.endswith(".id")
+    if type_name == "str":
+        return isinstance(value, str)
+    if type_name.endswith(".id"):
+        return (isinstance(value, (str, int)) and not isinstance(value, bool))
+    if type_name == "int":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if type_name == "float":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if type_name == "bool":
+        return isinstance(value, bool)
+    if type_name == "list":
+        return isinstance(value, (list, tuple))
+    if type_name == "dict":
+        return isinstance(value, dict)
+    if type_name == "time":
+        return isinstance(value, (int, float, str)) and not isinstance(value, bool)
+    return False
 _NATIVE_ALIASES = {
     "mute": "timeout",
     "unmute": "untimeout",
@@ -986,6 +1008,11 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
 
     variables: dict[str, object] = {}
     instructions: list[Instruction] = []
+    declared_types: dict[str, str] = {}
+    for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_.]+)\s*=", source):
+        declared_types[declaration.group(1)] = declaration.group(2)
+    for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", source):
+        declared_types[declaration.group(1)] = declaration.group(2)
     for line_number, statement in statements:
         else_match = _ELSE_STANDARD.fullmatch(statement) or _ELSE_COMPACT.fullmatch(statement)
         if else_match:
@@ -1000,6 +1027,13 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
 
         parsed = _parse_one(statement, line_number, variables, 0)
         for instruction in parsed:
+            if isinstance(instruction, SetVariable) and instruction.name in declared_types:
+                declared_type = declared_types[instruction.name]
+                if declared_type not in _TYPE_NAMES or not _value_matches_type(instruction.value, declared_type):
+                    raise ScriptError(
+                        f"Line {line_number}: value assigned to '{instruction.name}' "
+                        f"does not match declared type '{declared_type}'"
+                    )
             instructions.append(instruction)
             if isinstance(instruction, SetVariable):
                 variables[instruction.name] = instruction.value
