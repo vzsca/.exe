@@ -914,6 +914,67 @@ def _replace_outside_strings(source: str, pattern: str, replacement: str) -> str
     return "".join(output)
 
 
+def _mask_fstrings(source: str) -> tuple[str, dict[str, str]]:
+    """Hide f-string literals during block scanning, including nested quoted expressions."""
+    output = []
+    replacements = {}
+    i = 0
+    slash = chr(92)
+    while i < len(source):
+        if i + 1 >= len(source) or source[i] not in ("f", "F") or source[i + 1] not in ("'", '"'):
+            output.append(source[i])
+            i += 1
+            continue
+        start = i
+        outer = source[i + 1]
+        j = i + 2
+        depth = 0
+        inner = None
+        escaped = False
+        while j < len(source):
+            char = source[j]
+            if inner is not None:
+                if escaped:
+                    escaped = False
+                elif char == slash:
+                    escaped = True
+                elif char == inner:
+                    inner = None
+                j += 1
+                continue
+            if depth and char in ("'", '"'):
+                inner = char
+                j += 1
+                continue
+            if escaped:
+                escaped = False
+                j += 1
+                continue
+            if char == slash:
+                escaped = True
+                j += 1
+                continue
+            if depth == 0 and char == outer:
+                j += 1
+                break
+            if char == "{" and depth == 0 and j + 1 < len(source) and source[j + 1] == "{":
+                j += 2
+                continue
+            if char == "}" and depth == 0 and j + 1 < len(source) and source[j + 1] == "}":
+                j += 2
+                continue
+            if char == "{":
+                depth += 1
+            elif char == "}" and depth:
+                depth -= 1
+            j += 1
+        token = "__EXE_FSTRING_TOKEN_" + str(len(replacements)) + "__"
+        replacements[token] = source[start:j]
+        output.append(token)
+        i = j
+    return "".join(output), replacements
+
+
 def _normalize_modern_syntax(source: str) -> str:
     """Translate the agreed English, brace-based surface syntax to the legacy AST parser.
 
@@ -922,6 +983,7 @@ def _normalize_modern_syntax(source: str) -> str:
     """
     # First scan the source to turn top-level semicolons and braces into statement
     # boundaries while leaving quoted strings (including f-strings) untouched.
+    source, fstring_tokens = _mask_fstrings(source)
     lines: list[str] = []
     current: list[str] = []
     quote: str | None = None
@@ -1054,7 +1116,10 @@ def _normalize_modern_syntax(source: str) -> str:
             )
         # The legacy engine uses timeout(minutes) for mute(duration).
         normalized.append(" " * (len(line) - len(line.lstrip())) + stripped)
-    return "\n".join(normalized)
+    result = "\n".join(normalized)
+    for token, original in fstring_tokens.items():
+        result = result.replace(token, original)
+    return result
 
 
 def _validate_modern_surface_syntax(source: str) -> None:
