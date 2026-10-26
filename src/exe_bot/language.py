@@ -306,6 +306,8 @@ def _parse_body(
                 variables[instruction.name] = instruction.value
             elif isinstance(instruction, InputVariable):
                 variables[instruction.name] = "__EXE_PENDING_INPUT__"
+            elif isinstance(instruction, DiscordAction) and instruction.result_variable:
+                variables[instruction.result_variable] = f"__EXE_VAR_{instruction.result_variable}__"
     return body
 
 def _split_arguments(source: str) -> list[str]:
@@ -397,6 +399,16 @@ def _parse_one(
 ) -> list[Instruction]:
     if depth > _MAX_DEPTH:
         raise ScriptError(f"Line {line_number}: repeat nesting exceeds {_MAX_DEPTH} levels")
+
+    action_assignment = re.fullmatch(rf"set\s+({_NAME})\s*=\s*create_role\((.*)\)", statement)
+    if action_assignment:
+        name, raw_arguments = action_assignment.groups()
+        if name not in variables:
+            raise ScriptError(f"Line {line_number}: declare '{name}' with a typed variable before assigning a native action result")
+        action = _parse_discord_action(f"create_role({raw_arguments})", line_number, variables)
+        if action is None:
+            raise ScriptError(f"Line {line_number}: invalid create_role assignment")
+        return [DiscordAction(action.name, action.arguments, name)]
 
     match = _SET_STANDARD.fullmatch(statement) or _SET_COMPACT.fullmatch(statement)
     if match:
@@ -860,7 +872,7 @@ def _normalize_modern_syntax(source: str) -> str:
                 stripped = f"let {name} = input({question})"
             else:
                 assign = re.fullmatch(r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)", stripped)
-                if assign:
+                if assign and not re.fullmatch(r"@?create_role\s*\(.*\)", assign.group(2).strip()):
                     stripped = f"let {assign.group(1)} = {assign.group(2)}"
 
         # Native calls require @ in the new syntax; the runtime registry remains allowlisted.
@@ -1050,6 +1062,8 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
                 variables[instruction.name] = instruction.value
             elif isinstance(instruction, InputVariable):
                 variables[instruction.name] = "__EXE_PENDING_INPUT__"
+            elif isinstance(instruction, DiscordAction) and instruction.result_variable:
+                variables[instruction.result_variable] = f"__EXE_VAR_{instruction.result_variable}__"
 
     action_budget = sum(_count_actions(instruction) for instruction in instructions)
     if action_budget > max_actions:
