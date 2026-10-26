@@ -410,7 +410,7 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.reply(f"Syntax error: {exc}", mention_author=False)
             return False
 
-        current_action = {"index": 0, "name": "not started"}
+        current_action = {"index": 0, "name": "not started", "completed": 0}
         runtime_variables: dict[str, str] = {}
         log.info(".exe script parsed: %d actions (channel=%s actor=%s timeout=%ss)",
                  len(actions), ctx.channel.id, ctx.author.id, settings.script_timeout_seconds)
@@ -520,6 +520,8 @@ def build_bot(settings: Settings) -> ExeBot:
                                 f"Discord refused '{action.name}'. Verify the bot's permissions and role hierarchy. "
                                 "Check the bot logs for details."
                             ) from exc
+                    if isinstance(action, (InputVariable, SendMessage, DiscordAction)):
+                        current_action["completed"] = int(current_action["completed"]) + 1
                 finally:
                     log.info(".exe action %d/%d finished: %s (elapsed=%.2fs, channel=%s actor=%s)",
                              index, len(actions), action_name, time.monotonic() - started,
@@ -530,10 +532,17 @@ def build_bot(settings: Settings) -> ExeBot:
             await ctx.message.add_reaction("✅")
             return True
         except TimeoutError:
-            log.warning(".exe script timed out after %ss at action %s/%s (channel=%s actor=%s)",
-                        settings.script_timeout_seconds, current_action["index"], len(actions),
-                        ctx.channel.id, ctx.author.id)
-            await ctx.reply("Script stopped: execution time limit reached.", mention_author=False)
+            log.warning(
+                ".exe script timed out after %ss at action %s/%s; completed=%s (channel=%s actor=%s)",
+                settings.script_timeout_seconds, current_action["index"], len(actions),
+                current_action["completed"], ctx.channel.id, ctx.author.id,
+            )
+            await ctx.reply(
+                "Script stopped: execution time limit reached. "
+                f"{current_action['completed']} action(s) completed before the timeout; "
+                "completed Discord changes cannot be rolled back automatically.",
+                mention_author=False,
+            )
         except ScriptError as exc:
             await ctx.reply(f"Action refused: {exc}", mention_author=False)
         except discord.Forbidden as exc:
@@ -549,8 +558,19 @@ def build_bot(settings: Settings) -> ExeBot:
                 "details were written to the bot log.",
                 mention_author=False,
             )
-        except discord.HTTPException:
-            await ctx.reply("Discord rejected an action in this script.", mention_author=False)
+        except discord.HTTPException as exc:
+            log.warning(
+                ".exe script received Discord HTTP error at action %s/%s (channel=%s actor=%s): %s",
+                current_action["index"], len(actions), ctx.channel.id, ctx.author.id,
+                getattr(exc, "text", str(exc)),
+            )
+            await ctx.reply("Discord rejected an action in this script; details were written to the bot log.", mention_author=False)
+        except Exception:
+            log.exception(
+                ".exe script failed unexpectedly at action %s/%s (channel=%s actor=%s)",
+                current_action["index"], len(actions), ctx.channel.id, ctx.author.id,
+            )
+            await ctx.reply("Script failed unexpectedly; details were written to the bot log.", mention_author=False)
         return False
 
     @bot.command(name="exe")
