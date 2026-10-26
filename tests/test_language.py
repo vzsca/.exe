@@ -406,3 +406,35 @@ def test_give_role_and_remove_role_accept_discord_user_and_role_mentions():
     assert parse_script('remove_role("<@!123456789012345678>", "<@&987654321098765432>")') == [
         DiscordAction("remove_role", ("<@!123456789012345678>", "<@&987654321098765432>"))
     ]
+
+
+
+@pytest.mark.parametrize("action_name", ["give_role", "remove_role"])
+def test_role_assignment_can_use_nested_create_role_with_permissions_and_color(action_name):
+    program = parse_script(
+        f'{action_name}("<@1261777629837656161>", '
+        'create_role("Helpers", "#5865F2", "view_channel, send_messages"))'
+    )
+    assert program == [
+        DiscordAction(
+            "create_role",
+            ("Helpers", "#5865F2", "view_channel, send_messages"),
+            "__exe_result_0",
+        ),
+        DiscordAction(
+            action_name,
+            ("<@1261777629837656161>", "__EXE_VAR___exe_result_0__"),
+        ),
+    ]
+
+
+def test_nested_create_role_arguments_keep_commas_inside_permission_string():
+    program = parse_script(
+        'give_role("123456789012345678", '
+        'create_role("Helpers", "#5865F2", "view_channel, send_messages, manage_messages"))'
+    )
+    assert program[0] == DiscordAction(
+        "create_role",
+        ("Helpers", "#5865F2", "view_channel, send_messages, manage_messages"),
+        "__exe_result_0",
+    )
