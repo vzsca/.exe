@@ -84,8 +84,8 @@ Toutes les fonctions natives doivent commencer par `@`.
 | Fonction | Arguments acceptés par le parseur | Description |
 |---|---|---|
 | `@send(message)` | 1 argument | Envoie un message dans le contexte du script. |
-| `@send(channel, message)` | 2 arguments | Envoie un message dans le salon indiqué si le runtime le prend en charge. |
-| `@ban(user, reason?)` | 2 arguments actuellement | Bannit un membre. |
+| `@send(message, channel)` | 2 arguments | Envoie un message dans le salon texte indiqué par son ID ou son nom (avec ou sans `#`). |
+| `@ban(user, reason)` | 2 arguments | Bannit un membre avec une raison. |
 | `@unban(user_id)` | 1 à 2 arguments | Retire un bannissement. |
 | `@kick(user, reason?)` | 1 à 2 arguments | Expulse un membre. |
 | `@timeout(user, duration)` | 2 arguments | Applique un timeout ; durée exprimée en minutes dans le runtime actuel. |
@@ -103,6 +103,16 @@ Toutes les fonctions natives doivent commencer par `@`.
 | `@guilds_members()` | aucun | Liste jusqu'à 100 membres. |
 | `@guilds_channels()` | aucun | Liste les salons du serveur. |
 | `@guilds_categories()` | aucun | Liste les catégories du serveur. |
+
+Pour réutiliser un rôle créé par le script, déclare une variable de type `role.id`, puis affecte-lui le résultat de `@create_role` avec `set` :
+
+```text
+var helper_role.role.id = None;
+set helper_role = @create_role("Helpers", "#5865F2");
+@add_role("123456789012345678", helper_role);
+```
+
+Le résultat est une référence de rôle interne au script (`@ID`) résolue à l'exécution. La variable doit être déclarée avant l'affectation. Cette affectation native est actuellement prise en charge pour `@create_role` uniquement.
 
 Les alias `@mute` et `@unmute` sont normalisés en `@timeout` et `@untimeout`. Les fonctions `@dm`, `@lock`, `@unlock`, les setters `@set_channel.*` et `@set_role.*`, `@time` et `@uptime` ne sont pas disponibles dans le runtime actuel. `@random(collection)` n'est pas une fonction native : utiliser `randint(min, max)` pour un entier aléatoire.
 
