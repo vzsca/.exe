@@ -784,7 +784,7 @@ def _replace_outside_strings(source: str, pattern: str, replacement: str) -> str
             output.append(char)
             if escaped:
                 escaped = False
-            elif char == "\\\\":
+            elif char == "\\":
                 escaped = True
             elif char == quote:
                 quote = None
