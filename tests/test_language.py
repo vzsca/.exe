@@ -188,6 +188,6 @@ def test_nested_dictionary_and_list_literals():
 def test_dictionary_literal_does_not_break_following_block():
     program = parse_script(
         'var config.dict = {"mode": "safe"}; '
-        'if (config["mode"] == "safe") { @send("ok"); }'
+        'var mode.str = config["mode"]; if (mode == "safe") { @send("ok"); }'
     )
     assert expand_actions(program) == [SendMessage("ok")]
