@@ -1,130 +1,124 @@
-# Référence du langage .exe
+# .exe Language Reference
 
-Cette page décrit uniquement les fonctionnalités réellement prévues par le parseur et le runtime actuels. Elle ne doit pas être interprétée comme une promesse de fonctions futures.
+This document describes the syntax and behavior implemented by the current parser and Discord runtime. It is a reference to the current implementation, not a promise of future features.
 
-## Règles de syntaxe
+## Syntax rules
 
-- Les mots-clés, types et noms de fonctions sont en anglais.
-- Toute instruction doit se terminer par `;` : le point-virgule est obligatoire.
-- Le retour à la ligne est facultatif après un point-virgule.
-- Les blocs utilisent `{` et `}`. Les accolades des blocs ne sont pas suivies d'un point-virgule.
-- Les appels natifs commencent toujours par `@`.
-- La syntaxe historique (`let`, `send(...)` sans `@`, `v()`, `m()`, `R()`, `I()`, `E()`) est refusée.
-- Le langage n'exécute pas de code Python arbitraire.
+- Keywords, types, and native function names are English.
+- Every instruction must end with a semicolon (;).
+- Newlines are optional after a semicolon.
+- Blocks use braces ({ and }) and do not need a trailing semicolon.
+- Native Discord calls must be prefixed with @.
+- Legacy syntax such as let, unprefixed send(...), and compact v(), m(), R(), I(), or E() forms is rejected.
+- Scripts cannot execute arbitrary Python code.
 
-Exemple :
+Example:
 
-```text
-var greeting.str = "Hello";
-var count.int = 2;
-set count = count + 1;
-@send(f"{greeting}: {count}");
-```
+    var greeting.str = "Hello";
+    var count.int = 2;
+    set count = count + 1;
+    @send(f"{greeting}: {count}");
 
-## Variables et expressions
+## Variables and expressions
 
-Déclaration : `var name.type = value;`
+Declare a variable with var name.type = value; and update it with set name = expression;.
 
-Types acceptés par le parseur : `str`, `int`, `float`, `bool`, `list`, `dict`, `time`, `user.id`, `channel.id`, `category.id`, `role.id`, `message.id`.
+Supported declared types:
 
-Les déclarations typées vérifient la compatibilité des valeurs initiales et des affectations avec le type déclaré. `float` accepte aussi les entiers ; `list` accepte une liste ou un tuple ; `dict` accepte un dictionnaire ; `time` accepte un nombre ou une chaîne. `user.id`, `channel.id`, `category.id`, `role.id` et `message.id` acceptent une chaîne, un entier ou `None` pour représenter une référence non renseignée. Les suffixes `.id` ne garantissent pas à eux seuls l'existence de l'objet Discord.
+str, int, float, bool, list, dict, time, user.id, channel.id, category.id, role.id, and message.id.
 
-Pour mettre à jour une variable existante : `set name = expression;`
+Type checks apply to declarations and assignments. float also accepts integers; list accepts lists and tuples; dict accepts dictionaries; time accepts numbers and strings. The .id types accept strings, integers, or None for an unset reference. An .id type does not prove that the referenced Discord object exists.
 
-Les expressions sûres prennent en charge les constantes, variables, listes et tuples littéraux, indexation, opérations arithmétiques (`+`, `-`, `*`, `/`, `//`, `%`), opérations booléennes (`and`, `or`, `not`) et comparaisons (`==`, `!=`, `<`, `<=`, `>`, `>=`). Les appels de fonctions arbitraires et l'accès aux attributs Python ne sont pas permis dans les expressions.
+Safe expressions support constants, variables, list/tuple/dictionary literals, indexing, arithmetic (+, -, *, /, //, %), Boolean operations (and, or, not), and comparisons (==, !=, <, <=, >, >=). Arbitrary function calls and Python attribute access are not allowed. Collections are limited to 100 items.
 
-Les dictionnaires littéraux sont pris en charge, y compris les dictionnaires imbriqués. Exemple : `var config.dict = {"mode": "safe", "retries": 3};`. Les clés et valeurs doivent respecter les expressions sûres prises en charge. L'indexation permet de lire une valeur, par exemple `config["mode"]`. Les accolades qui suivent un en-tête `if`, `else`, `repeat` ou `for` continuent de délimiter les blocs.
+Dictionary example:
 
-Valeurs booléennes : `True`, `False`; valeur vide : `None`. `randint(min, max)` est accepté comme expression bornée.
+    var config.dict = {"mode": "safe", "retries": 3};
+    var mode.str = config["mode"];
+    var enabled.bool = config["nested"]["enabled"];
 
-## Conditions et boucles
+Nested dictionaries and indexing are supported. Dictionary keys and values must still be valid safe expressions.
 
-Les conditions actuellement prises en charge comparent une variable à une valeur :
+Boolean literals are True and False; the empty value is None. randint(min, max) returns a bounded random integer. Its minimum cannot exceed its maximum, and bounds must stay between -1,000,000,000 and 1,000,000,000.
 
-```text
-var mode.str = "safe";
-if (mode == "safe") {
-    @send("allowed");
-} else {
-    @send("blocked");
-}
-```
+## Conditions and loops
 
-Les opérateurs de comparaison généraux existent dans les expressions, mais la syntaxe de bloc conditionnel ne prend pas encore en charge toutes les expressions composées. `elif` et les boucles sur des collections Discord ne sont pas pris en charge.
+An if condition currently compares one declared variable with one expected value. An optional else block is supported:
 
-Répétition bornée :
+    var mode.str = "safe";
+    if (mode == "safe") {
+        @send("allowed");
+    } else {
+        @send("blocked");
+    }
 
-```text
-repeat(3) {
-    @send("again");
-}
-```
+General compound expressions are not supported in block conditions. elif and loops over Discord collections are not supported.
 
-Boucle numérique bornée :
+Repeat a block a fixed number of times:
 
-```text
-for i in range(0, 3) {
-    @send(f"item {i}");
-}
-```
+    repeat(3) {
+        @send("again");
+    }
 
-Les répétitions et plages sont limitées à 10 itérations et la profondeur d'imbrication est limitée. Le nombre d'actions compilées est vérifié avant exécution.
+Iterate over a numeric range (the stop value is exclusive):
 
-## Saisie
+    for i in range(0, 3) {
+        @send(f"item {i}");
+    }
 
-```text
-var username.input{str, "What is your username?"} = "";
-@send(f"Hello {username}!");
-```
+Repeat counts and ranges are limited to 10 iterations. Range bounds must be between -1,000,000 and 1,000,000, and the stop value must be greater than the start value. Nested blocks are limited to four levels. The action budget is checked before execution.
 
-Le parseur accepte la déclaration de saisie pour `str`, `int`, `float`, `bool` et les types d'identifiant (`user.id`, `channel.id`, `category.id`, `role.id`, `message.id`). `list`, `dict` et `time` ne sont pas acceptés pour `input`. La réponse est demandée pendant l'exécution et est soumise au délai maximal configuré. La valeur initiale déclarée est actuellement ignorée ; la réponse est traitée comme du texte.
+## User input
 
-## Fonctions natives actuellement reconnues
+    var username.input{str, "What is your username?"} = "";
+    @send(f"Hello {username}!");
 
-Toutes les fonctions natives doivent commencer par `@`.
+Input declarations accept str, int, float, bool, and the .id types. list, dict, and time are not accepted for input. The initial value is currently ignored: the reply is stored as plain text regardless of the declared type. Input waits for a message from the script author in the same channel and uses the configured script timeout. Replies over 1,800 characters are rejected, and @ is neutralized to prevent user-supplied mentions from pinging.
 
-| Fonction | Arguments acceptés par le parseur | Description |
-|---|---|---|
-| `@send(message)` | 1 argument | Envoie un message dans le contexte du script. |
-| `@send(message, channel)` | 2 arguments | Envoie un message dans le salon texte indiqué par son ID ou son nom (avec ou sans `#`). |
-| `@ban(user, reason)` | 2 arguments | Bannit un membre avec une raison. |
-| `@unban(user_id)` | 1 à 2 arguments | Retire un bannissement. |
-| `@kick(user, reason?)` | 1 à 2 arguments | Expulse un membre. |
-| `@timeout(user, duration)` | 2 arguments | Applique un timeout ; durée exprimée en minutes dans le runtime actuel. |
-| `@untimeout(user)` | 1 argument | Retire un timeout. |
-| `@give_role(user, role)` / `@add_role(user, role)` | 2 arguments | Attribue un rôle. |
-| `@remove_role(user, role)` | 2 arguments | Retire un rôle. |
-| `@create_role(name, color?, permissions?)` | 1 à 3 arguments | Crée un rôle, selon les options prises en charge par le runtime. |
-| `@delete_role(role_id_or_name)` | 1 argument | Supprime un rôle identifié par ID ou nom exact. |
-| `@create_category(name, permissions?)` | 1 à 2 arguments | Crée une catégorie. |
-| `@create_channel(name, category?, permissions?)` | 1 à 3 arguments | Crée un salon texte, éventuellement dans une catégorie existante, avec des permissions de salon. |
-| `@delete_channel(channel_id_or_name)` | 1 argument | Supprime uniquement un salon texte identifié par ID ou nom exact ; les catégories sont refusées. |
-| `@slowmode(seconds)` | 1 argument | Configure le mode lent dans le contexte pris en charge. |
-| `@clear(count)` | 1 argument | Supprime un nombre limité de messages. |
-| `@guilds_roles()` | aucun | Liste les rôles du serveur. |
-| `@guilds_members()` | aucun | Liste jusqu'à 100 membres. |
-| `@guilds_channels()` | aucun | Liste les salons du serveur. |
-| `@guilds_categories()` | aucun | Liste les catégories du serveur. |
+## Native Discord actions
 
-Pour réutiliser un rôle créé par le script, déclare une variable de type `role.id`, puis affecte-lui le résultat de `@create_role` avec `set` :
+Native calls must start with @.
 
-```text
-var helper_role.role.id = None;
-set helper_role = @create_role("Helpers", "#5865F2");
-@add_role("123456789012345678", helper_role);
-```
+| Function | Arguments | Behavior |
+|---|---:|---|
+| @send(message) | 1 | Send a message in the current channel. |
+| @send(message, channel) | 2 | Send to a text channel identified by ID or exact name; a leading # is optional for names. |
+| @ban(user, reason) | 2 | Ban a user; the reason is required by the parser. |
+| @unban(user_id[, reason]) | 1–2 | Remove a ban. |
+| @kick(user[, reason]) | 1–2 | Kick a member. |
+| @timeout(user, minutes) | 2 | Timeout a member for 1–40,320 minutes. |
+| @untimeout(user) | 1 | Remove a timeout. |
+| @give_role(user, role) / @add_role(user, role) | 2 | Assign a role. |
+| @remove_role(user, role) | 2 | Remove a role. |
+| @create_role(name[, color[, permissions]]) | 1–3 | Create a role. Color is a six-digit hex value; permissions are a comma-separated allowlist. The administrator permission and other unsupported permissions are rejected. |
+| @delete_role(role_id_or_name) | 1 | Delete a role by ID or exact name. |
+| @create_category(name[, permissions]) | 1–2 | Create a category, optionally with role permission overwrites. |
+| @create_channel(name[, category[, permissions]]) | 1–3 | Create a text channel, optionally in an existing category and with permission overwrites. |
+| @delete_channel(channel_id_or_name) | 1 | Delete a text channel by ID or exact name. Categories are not accepted. |
+| @slowmode(seconds) | 1 | Set slowmode in the current text channel (0–21,600 seconds). |
+| @clear(count) | 1 | Delete 1–100 messages in the current text channel. |
+| @guilds_roles() | 0 | List server roles. |
+| @guilds_members() | 0 | List up to 100 server members. Requires Server Members Intent and appropriate Discord access. |
+| @guilds_channels() | 0 | List server channels, excluding categories. |
+| @guilds_categories() | 0 | List server categories. |
 
-Le résultat est une référence de rôle interne au script (`@ID`) résolue à l'exécution. La variable doit être déclarée avant l'affectation. Cette affectation native est actuellement prise en charge pour `@create_role` uniquement.
+For @create_role, permission names are explicitly allowlisted in the runtime. They include selected channel, voice, moderation, and audit-log permissions, but not administrator. Category/channel overwrites use entries such as "@everyone:view_channel=deny, Moderators:send_messages=allow". Targets can be @everyone, a role ID, or an exact role name.
 
-Les alias `@mute` et `@unmute` sont normalisés en `@timeout` et `@untimeout`. Les fonctions `@dm`, `@lock`, `@unlock`, les setters `@set_channel.*` et `@set_role.*`, `@time` et `@uptime` ne sont pas disponibles dans le runtime actuel. `@random(collection)` n'est pas une fonction native : utiliser `randint(min, max)` pour un entier aléatoire.
+To reuse a role created by a script, declare a role.id variable and assign it the native action result:
 
-Le nombre d'arguments et les fonctions sont vérifiés par le parseur. Les actions Discord nécessitent également les permissions du membre et du bot, ainsi que le respect de la hiérarchie des rôles et des limites de l'API Discord.
+    var helper_role.role.id = None;
+    set helper_role = @create_role("Helpers", "#5865F2");
+    @add_role("123456789012345678", helper_role);
 
-## Limites et sécurité
+The result is stored as an internal role reference and resolved during execution. The variable must be declared first and have type role.id. This assignment form is currently supported for @create_role only.
 
-- Taille maximale du script : 8 000 caractères.
-- Budget d'actions configurable par `MAX_SCRIPT_ACTIONS` (1 000 par défaut, maximum 1 000).
-- Durée maximale configurable par `SCRIPT_TIMEOUT_SECONDS` (300 secondes / 5 minutes par défaut, maximum 300).
-- Les actions de modération sont soumises à des vérifications de permissions côté bot.
-- Les expressions sont évaluées à partir d'une liste autorisée de nœuds AST ; aucun `eval` ou `exec` n'est utilisé.
-- Les fonctions et propriétés non listées ici doivent être considérées comme non prises en charge.
+Aliases @mute and @unmute normalize to @timeout and @untimeout. The runtime does not implement @dm, @lock, @unlock, @set_channel.*, @set_role.*, @time, @uptime, or @random(collection). Use randint(min, max) for a random integer.
+
+## Runtime limits and safety
+
+- Maximum script length: 8,000 characters.
+- Runtime action budget: MAX_SCRIPT_ACTIONS, default 1,000 and maximum 1,000.
+- Script and input timeout: SCRIPT_TIMEOUT_SECONDS, default 300 seconds and maximum 300 seconds.
+- Each Discord action is subject to the caller's and bot's effective permissions and Discord role hierarchy.
+- Expressions are evaluated using an explicit AST allowlist; arbitrary eval and exec are not used.
+- Native actions can still make destructive changes. Review scripts before execution and grant the bot only the permissions it needs.
