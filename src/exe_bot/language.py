@@ -255,6 +255,14 @@ def _parse_discord_action(statement: str, line_number: int, variables: dict[str,
                 raise ScriptError(f"Line {line_number}: arguments must be quoted text, integers, or defined variables") from exc
         if not isinstance(value, (str, int)) or isinstance(value, bool):
             raise ScriptError(f"Line {line_number}: unsupported function argument")
+        if isinstance(value, str):
+            # Allow bounded repeat variables in quoted action arguments, e.g.
+            # create_channel("annonces-{i}") inside "repeat 3 as i: ...".
+            value = re.sub(
+                r"{([A-Za-z_][A-Za-z0-9_]*)}",
+                lambda match: str(variables[match.group(1)]) if match.group(1) in variables else match.group(0),
+                value,
+            )
         if isinstance(value, str) and len(value) > 1800:
             raise ScriptError(f"Line {line_number}: argument is too long")
         arguments.append(value)
