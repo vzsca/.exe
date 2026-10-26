@@ -61,6 +61,9 @@ Counted loops can define a 1-based counter with `repeat 3 as i: ...`, or use Pyt
 
 ```text
 repeat 3 as i: send(f"{create_role('role {i}')}")
+for i in range(1, 4):
+    create_category("Test-{i}")
+    create_channel("annonces-test-{i}", "Test-{i}")
 ```
 
 This creates `role 1`, `role 2`, and `role 3`, then sends each created role's mention. The second example creates three categories and a text channel in each one. Random values are available with `let roll = randint(1, 6)` or `send(f\"Roll: {randint(1, 6)}\")`; both bounds are inclusive and limited to integers between -1,000,000,000 and 1,000,000,000.
