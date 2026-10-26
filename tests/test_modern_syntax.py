@@ -119,3 +119,13 @@ def test_legacy_native_call_inside_a_line_is_rejected():
 def test_semicolon_inside_string_is_not_a_separator():
     program = parse_script('@send("one; two");')
     assert expand_actions(program) == [SendMessage("one; two")]
+
+
+def test_declared_integer_type_rejects_text():
+    with pytest.raises(ScriptError, match="does not match declared type"):
+        parse_script('var count.int = "three"; @send("x");')
+
+
+def test_declared_boolean_type_rejects_integer():
+    with pytest.raises(ScriptError, match="does not match declared type"):
+        parse_script('var enabled.bool = 1; @send("x");')
