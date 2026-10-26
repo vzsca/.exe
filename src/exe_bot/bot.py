@@ -381,7 +381,7 @@ def build_bot(settings: Settings) -> ExeBot:
                 reason=f".exe by {actor.id}",
             )
             # The #ID token is resolved to a real Discord channel mention by @send.
-            return f"#{created_channel.id}"
+            return str(created_channel.id)
         elif name == "delete_channel":
             raw = str(args[0])
             channel = guild.get_channel(int(raw)) if raw.isdigit() else discord.utils.get(guild.text_channels, name=raw)
