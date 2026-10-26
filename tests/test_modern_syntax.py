@@ -30,11 +30,11 @@ def test_brace_if_and_repeat_syntax():
     ]
 
 
-def test_english_action_aliases_are_normalized():
+def test_canonical_english_action_names_are_supported():
     assert parse_script('@add_role("123456789012345678", "Helpers")') == [
         DiscordAction("give_role", ("123456789012345678", "Helpers"))
     ]
-    assert parse_script('@create_chanel("general")') == [
+    assert parse_script('@create_channel("general")') == [
         DiscordAction("create_channel", ("general",))
     ]
 
@@ -57,3 +57,13 @@ def test_unknown_declared_type_is_rejected():
 def test_unclosed_brace_is_rejected():
     with pytest.raises(ScriptError, match="Unclosed block brace"):
         parse_script('repeat(2) { @send("x");')
+
+
+def test_none_is_accepted_for_unset_typed_discord_ids():
+    program = parse_script('var target.user.id = None; @send("ready");')
+    assert program == [SendMessage("ready")]
+
+
+def test_misspelled_channel_function_is_not_a_supported_alias():
+    with pytest.raises(ScriptError, match="unknown instruction"):
+        parse_script('@create_chanel("general")')
