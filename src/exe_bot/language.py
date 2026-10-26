@@ -1146,6 +1146,8 @@ def _normalize_modern_syntax(source: str) -> str:
 
 def _validate_modern_surface_syntax(source: str) -> None:
     """Validate statement terminators and reject legacy syntax before normalization."""
+    # Nested quotes inside f-string expressions must not confuse the surface scanner.
+    source, _ = _mask_fstrings(source)
     legacy_patterns = (
         (r"(?<![\w@])\blet\s+", "Legacy 'let' declarations are not supported; use 'var name.type = value;'"),
         (r"(?<![\w@])\bv\s*\(", "Compact syntax v(...) is not supported."),
