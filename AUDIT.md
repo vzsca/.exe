@@ -80,3 +80,8 @@ GitHub Actions completed successfully for the test and compile workflow on both 
 - `start_bot.bat`
 - `start_bot.sh`
 - `.github/workflows/python-tests.yml`
+
+
+## Follow-up — typed Discord action results
+
+The follow-up review found that only `create_role` returned a value to scripts. The runtime and parser now also support results from `create_channel` and `create_category`: channel IDs can be rendered as safe channel mentions in f-strings, and category IDs can be passed to channel-creation actions. These paths have parser regression tests. Nested direct calls such as `@create_channel(...)` inside an f-string remain unsupported; use a typed variable assignment and a later send instead.
