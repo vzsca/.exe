@@ -289,11 +289,12 @@ def build_bot(settings: Settings) -> ExeBot:
                     overwrite = overwrites.setdefault(target, discord.PermissionOverwrite())
                     setattr(overwrite, permission, decision == "allow")
 
-            await guild.create_category(
+            created_category = await guild.create_category(
                 category_name,
                 overwrites=overwrites,
                 reason=f".exe by {actor.id}",
             )
+            return str(created_category.id)
         elif name == "create_channel":
             channel_name = str(args[0]).strip()
             if not channel_name or len(channel_name) > 100:
@@ -373,12 +374,14 @@ def build_bot(settings: Settings) -> ExeBot:
             if category is not None and not overwrites:
                 overwrites = category.overwrites
 
-            await guild.create_text_channel(
+            created_channel = await guild.create_text_channel(
                 channel_name,
                 category=category,
                 overwrites=overwrites,
                 reason=f".exe by {actor.id}",
             )
+            # The #ID token is resolved to a real Discord channel mention by @send.
+            return f"#{created_channel.id}"
         elif name == "delete_channel":
             raw = str(args[0])
             channel = guild.get_channel(int(raw)) if raw.isdigit() else discord.utils.get(guild.text_channels, name=raw)
@@ -501,6 +504,16 @@ def build_bot(settings: Settings) -> ExeBot:
                                     allowed_roles.append(role)
                                 return role.mention
                             content = role_id_pattern.sub(replace_role_id, content)
+                        if action.channel_mentions:
+                            if ctx.guild is None:
+                                raise ScriptError("Channel mentions only work inside a server.")
+                            channel_id_pattern = re.compile(r"(?<!\w)#([0-9]{15,22})(?!\d)")
+                            def replace_channel_id(match: re.Match[str]) -> str:
+                                channel_obj = ctx.guild.get_channel(int(match.group(1)))
+                                if channel_obj is None:
+                                    return match.group(0)
+                                return channel_obj.mention
+                            content = channel_id_pattern.sub(replace_channel_id, content)
                         await target.send(
                             content,
                             allowed_mentions=discord.AllowedMentions(
