@@ -270,13 +270,13 @@ def test_repeat_block_keeps_all_actions_in_each_iteration():
 
 
 def test_fstring_accepts_nested_create_role_call_with_double_quotes():
-    source = 'var test.int = 10; repeat(3){@send(f"{test}{@create_role("role","#FF0000",administrator:True)}");}'
+    source = 'var test.int = 10; repeat(3){@send(f"{test}{@create_role("role","#FF0000",manage_messages:True)}");}'
     program = parse_script(source)
     actions = expand_actions(program)
     assert len(actions) == 6
     assert all(isinstance(action, DiscordAction) for action in actions[0::2])
     assert all(action.name == "create_role" for action in actions[0::2])
-    assert all(action.arguments == ("role", "#FF0000", "administrator") for action in actions[0::2])
+    assert all(action.arguments == ("role", "#FF0000", "manage_messages") for action in actions[0::2])
     assert all(isinstance(action, SendMessage) for action in actions[1::2])
     assert all(action.role_mentions for action in actions[1::2])
     assert all(action.text.startswith("10__EXE_VAR___exe_result_") for action in actions[1::2])
