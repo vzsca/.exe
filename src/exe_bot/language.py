@@ -1,7 +1,8 @@
-"""Safe parser for the first .exe language features.
+"""Parser for the documented .exe script syntax.
 
-The standard and compact forms are parsed separately and produce the same
-internal instructions. No Python code is evaluated or executed.
+The public entry point accepts only the modern, brace-based syntax and validates
+its surface grammar before translating it into internal instructions. Expressions
+are evaluated through an explicit AST allowlist; no Python code is executed.
 """
 
 from dataclasses import dataclass
