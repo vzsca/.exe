@@ -65,7 +65,7 @@ Arithmétique : `+`, `-`, `*`, `/`, `%`.
 
 Comparisons : `==`, `!=`, `<`, `>`, `<=`, `>=`. Les types comparés doivent être compatibles.
 
-Logique : `&&` signifie ET, `!!` signifie OU et `#` signifie NON. Les parenthèses regroupent les expressions. Les priorités suivent les règles usuelles des expressions.
+Les parenthèses regroupent les expressions. Les opérateurs logiques personnalisés `&&`, `!!` et `#` ne sont pas encore traduits de façon cohérente par le moteur.
 
 ## Conditions
 
@@ -79,7 +79,7 @@ if (attempts >= 3 && enabled == True) {
 }
 ```
 
-`elif` et `else if` sont acceptés. La condition doit produire un booléen.
+Le moteur actuel prend en charge les conditions simples sur une variable et une valeur, avec `else`. Les conditions composées et les blocs `elif` ne sont pas encore pris en charge de façon fiable.
 
 ## Boucles
 
@@ -88,16 +88,12 @@ repeat(3) {
     @send("Repeat");
 }
 
-for member in guild.member {
-    @send(member.name);
-}
-
 for i in range(0, 5) {
     @send(f"Tour {i}");
 }
 ```
 
-`repeat(n)` repeats the block n times. `for variable in collection` iterates over a collection. `range(start, stop)` includes the start and excludes the stop: `range(0, 5)` produces 0 to 4. Discord collections should be iterated over a stable snapshot if the script modifies them.
+`repeat(n)` repeats the block n times. `range(start, stop)` includes the start and excludes the stop: `range(0, 5)` produces 0 to 4. Discord collections should be iterated over a stable snapshot if the script modifies them.
 
 ## Chaînes formatées
 
@@ -289,12 +285,13 @@ Un résultat `False` correspond à un échec à l'exécution, pas à une erreur 
 - Une syntaxe inconnue ou un appel à une fonction non autorisée provoque une erreur de compilation.
 - Les types des variables et des arguments sont vérifiés avant l'exécution lorsque c'est possible.
 - Les entrées user sont validées quand la réponse est reçue.
-- Le script est limité à 1 000 actions.
-- La compilation est limitée à 5 minutes et l'exécution à 5 minutes supplémentaires, soit 10 minutes maximum au total.
+- La taille maximale d'un script est de 8 000 caractères.
+- Le budget d'actions est configurable avec `MAX_SCRIPT_ACTIONS` (20 par défaut dans la configuration actuelle).
+- La durée maximale d'exécution est configurable avec `SCRIPT_TIMEOUT_SECONDS` (60 secondes par défaut).
 - Les boucles dépendant de l'état réel du serveur peuvent produire un nombre d'actions variable ; un compteur d'actions doit donc aussi être appliqué pendant l'exécution.
 - Les opérations Discord restent soumises aux permissions du bot, à la hiérarchie des rôles et aux limites de l'API Discord.
 
-## Exemple complet
+## Exemple complet compatible avec le moteur actuel
 
 ```text
 var username.input{str, "What is your username?"} = "";
