@@ -57,7 +57,7 @@ var wait.time = 10;
 set attempts = 4;
 ```
 
-`None` signifie qu’aucune valeur n’est définie. Il peut initialiser une variable typée en attente d’une valeur, notamment un identifiant Discord. `""` reste une chaîne vide de type `str`. Une liste vide s'écrit `()`, un dictionnaire vide `[]`. `set nom = valeur` modifie une variable existante, sans répéter son type ; une valeur incompatible produit une erreur de type.
+`None` signifie qu’aucune valeur n’est définie. Il peut initialiser une variable typée en attente d’une valeur, notamment un identifiant Discord. `""` reste une chaîne vide de type `str`. Une liste vide s'écrit `()`, un dictionnaire vide `[]`. `set nom = valeur` modifie une variable existante, sans répéter son type. Le moteur actuel vérifie certaines valeurs lors de la compilation, mais la validation stricte de tous les types déclarés reste incomplète.
 
 ## Opérateurs et expressions
 
@@ -142,10 +142,10 @@ Dictionary deletion is performed by key only, never by position. Keys and positi
 Une entrée est déclarée avec `.input` suivi du type attendu et de la question. `input` est un modificateur de déclaration, pas un type.
 
 ```text
-var username.input{str, "What is your username?"} = ""
-var age.input{int, "How old are you?"} = ""
-var enabled.input{bool, "Enable this feature?"} = False
-var target.input{user.id, "What is the Discord ID?"} = None
+var username.input{str, "What is your username?"} = "";
+var age.input{int, "How old are you?"} = "";
+var enabled.input{bool, "Enable this feature?"} = False;
+var target.input{user.id, "What is the Discord ID?"} = None;
 ```
 
 Types pris en charge par les entrées : `str`, `int`, `float`, `bool`, `user.id`, `channel.id`, `category.id`, `role.id` et `message.id`. Les entrées de type liste et dictionnaire ne sont pas prises en charge.
@@ -198,7 +198,7 @@ Le test `valeur in collection.propriete` vérifie si la valeur figure parmi les 
 
 ## Fonctions natives
 
-Tous les appels de fonctions commencent par `@`. Seules les fonctions répertoriées et effectivement implémentées dans la version du bot sont utilisables.
+Tous les appels de fonctions commencent par `@`. La syntaxe est obligatoire même si le moteur convertit ensuite les appels en instructions internes. Seules les fonctions effectivement présentes dans le parseur et le runtime sont utilisables ; certaines fonctions de configuration listées ci-dessous restent prévues et ne sont pas encore implémentées.
 
 ### Valeurs et informations
 
