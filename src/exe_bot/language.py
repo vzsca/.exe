@@ -1014,6 +1014,21 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
         declared_types[declaration.group(1)] = declaration.group(2)
     for declaration in re.finditer(r"var\s+([A-Za-z_][A-Za-z0-9_]*)\.input\{([A-Za-z_.]+)\s*,", declared_source):
         declared_types[declaration.group(1)] = declaration.group(2)
+    def validate_declared_types(instruction: Instruction, line_number: int) -> None:
+        if isinstance(instruction, SetVariable) and instruction.name in declared_types:
+            declared_type = declared_types[instruction.name]
+            if declared_type not in _TYPE_NAMES or not _value_matches_type(instruction.value, declared_type):
+                raise ScriptError(
+                    f"Line {line_number}: value assigned to '{instruction.name}' "
+                    f"does not match declared type '{declared_type}'"
+                )
+        elif isinstance(instruction, Repeat):
+            for nested in instruction.body:
+                validate_declared_types(nested, line_number)
+        elif isinstance(instruction, IfEquals):
+            for nested in (*instruction.body, *instruction.else_body):
+                validate_declared_types(nested, line_number)
+
     for line_number, statement in statements:
         else_match = _ELSE_STANDARD.fullmatch(statement) or _ELSE_COMPACT.fullmatch(statement)
         if else_match:
@@ -1028,13 +1043,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
 
         parsed = _parse_one(statement, line_number, variables, 0)
         for instruction in parsed:
-            if isinstance(instruction, SetVariable) and instruction.name in declared_types:
-                declared_type = declared_types[instruction.name]
-                if declared_type not in _TYPE_NAMES or not _value_matches_type(instruction.value, declared_type):
-                    raise ScriptError(
-                        f"Line {line_number}: value assigned to '{instruction.name}' "
-                        f"does not match declared type '{declared_type}'"
-                    )
+            validate_declared_types(instruction, line_number)
             instructions.append(instruction)
             if isinstance(instruction, SetVariable):
                 variables[instruction.name] = instruction.value
