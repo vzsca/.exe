@@ -61,7 +61,7 @@ def test_unclosed_brace_is_rejected():
 
 def test_none_is_accepted_for_unset_typed_discord_ids():
     program = parse_script('var target.user.id = None; @send("ready");')
-    assert program == [SendMessage("ready")]
+    assert program[0].name == "target"\n    assert program[0].value is None\n    assert expand_actions(program) == [SendMessage("ready")]
 
 
 def test_misspelled_channel_function_is_not_a_supported_alias():
