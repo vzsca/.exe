@@ -53,14 +53,6 @@ class Database:
                     PRIMARY KEY (owner_id, name)
                 );
 
-                CREATE TABLE IF NOT EXISTS event_handlers (
-                    owner_id INTEGER NOT NULL CHECK (owner_id > 0),
-                    event_name TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (owner_id, event_name)
-                );
                 """
             )
 
@@ -144,49 +136,3 @@ class Database:
             )
             return cursor.rowcount == 1
 
-    def save_event(self, owner_id: int, event_name: str, source: str, *, enabled: bool = True) -> None:
-        self._validate_name(event_name)
-        if owner_id <= 0:
-            raise StorageError("Owner ID must be a positive integer.")
-        if not source.strip() or len(source) > 8000:
-            raise StorageError("Event script must contain between 1 and 8000 characters.")
-        with self._connect() as db:
-            db.execute(
-                """
-                INSERT INTO event_handlers (owner_id, event_name, source, enabled, updated_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(owner_id, event_name) DO UPDATE SET
-                    source = excluded.source,
-                    enabled = excluded.enabled,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (owner_id, event_name, source, int(enabled)),
-            )
-
-    def get_event(self, owner_id: int, event_name: str) -> tuple[str, bool] | None:
-        self._validate_name(event_name)
-        with self._connect() as db:
-            row = db.execute(
-                "SELECT source, enabled FROM event_handlers WHERE owner_id = ? AND event_name = ?",
-                (owner_id, event_name),
-            ).fetchone()
-            if row is None:
-                return None
-            return str(row["source"]), bool(row["enabled"])
-
-    def list_events(self, owner_id: int) -> list[str]:
-        with self._connect() as db:
-            rows = db.execute(
-                "SELECT event_name FROM event_handlers WHERE owner_id = ? ORDER BY event_name",
-                (owner_id,),
-            ).fetchall()
-            return [str(row["event_name"]) for row in rows]
-
-    def delete_event(self, owner_id: int, event_name: str) -> bool:
-        self._validate_name(event_name)
-        with self._connect() as db:
-            cursor = db.execute(
-                "DELETE FROM event_handlers WHERE owner_id = ? AND event_name = ?",
-                (owner_id, event_name),
-            )
-            return cursor.rowcount == 1

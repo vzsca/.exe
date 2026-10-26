@@ -236,8 +236,14 @@ def _parse_value(source: str, line_number: int, variables: dict[str, object]) ->
     return value
 
 
-def _split_statements(source: str) -> list[tuple[int, str]]:
-    """Split instructions on top-level newlines, semicolons, or § separators."""
+def _split_statements(
+    source: str, *, split_block_separator: bool = True
+) -> list[tuple[int, str]]:
+    """Split instructions on top-level newlines and semicolons.
+
+    The internal § separator is only split while parsing a block body; at the
+    top level it must remain attached to its if/repeat statement.
+    """
     statements: list[tuple[int, str]] = []
     quote: str | None = None
     escaped = False
@@ -270,12 +276,16 @@ def _split_statements(source: str) -> list[tuple[int, str]]:
                         raise ScriptError("Unexpected closing parenthesis in script")
                     paren_depth -= 1
 
-            if char in (";", "§") and quote is None and paren_depth == 0:
+            if (
+                (char == ";" or (char == "§" and split_block_separator))
+                and quote is None
+                and paren_depth == 0
+            ):
                 part = "".join(current).strip()
                 if part and not part.startswith("#"):
                     statements.append((statement_line, part))
                 current = []
-                statement_line = line_number
+                statement_line = statement_line + 1 if char == "§" else line_number
             else:
                 current.append(char)
 
@@ -306,8 +316,9 @@ def _parse_body(
     """Parse multiple nested instructions while sharing the current variables."""
     statements = _split_statements(source)
     body: list[Instruction] = []
-    for _, statement in statements:
-        parsed = _parse_one(statement, line_number, variables, depth)
+    for nested_line, statement in statements:
+        effective_line = line_number + nested_line if "§" in source else line_number
+        parsed = _parse_one(statement, effective_line, variables, depth)
         body.extend(parsed)
         for instruction in parsed:
             if isinstance(instruction, SetVariable):
@@ -1077,7 +1088,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
     declared_source = source
     source = _normalize_modern_syntax(source)
     source = _normalize_indented_blocks(source)
-    statements = _split_statements(source)
+    statements = _split_statements(source, split_block_separator=False)
     if not statements:
         raise ScriptError("Script is empty")
 
@@ -1117,7 +1128,7 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
             previous = instructions[-1]
             if previous.else_body:
                 raise ScriptError(f"Line {line_number}: an if condition can only have one else")
-            else_body = _parse_one(else_match.group(1).strip(), line_number, variables, 1)
+            else_body = _parse_body(else_match.group(1).strip(), line_number, variables, 1)
             instructions[-1] = IfEquals(
                 previous.matched, previous.body, tuple(else_body),
                 previous.variable_name, previous.expected,

@@ -229,3 +229,40 @@ def test_expression_numeric_result_is_bounded():
     expression = " * ".join([large] * 6)
     with pytest.raises(ScriptError, match="numeric result is too large"):
         parse_script(f"var value.int = {expression}; @send(\"safe\");")
+
+
+
+def test_if_branch_keeps_all_actions_inside_the_branch():
+    program = parse_script(
+        'var mode.str = "safe"; '
+        'if (mode == "safe") { @send("first"); @send("second"); } '
+        'else { @send("blocked-1"); @send("blocked-2"); } '
+        '@send("after");'
+    )
+    assert expand_actions(program) == [
+        SendMessage("first"),
+        SendMessage("second"),
+        SendMessage("after"),
+    ]
+
+
+def test_else_branch_can_contain_multiple_actions():
+    program = parse_script(
+        'var mode.str = "safe"; '
+        'if (mode == "admin") { @send("admin"); } '
+        'else { @send("safe-1"); @send("safe-2"); }'
+    )
+    assert expand_actions(program) == [
+        SendMessage("safe-1"),
+        SendMessage("safe-2"),
+    ]
+
+
+def test_repeat_block_keeps_all_actions_in_each_iteration():
+    program = parse_script(
+        'repeat(2) { @send("first"); @send("second"); }'
+    )
+    assert expand_actions(program) == [
+        SendMessage("first"), SendMessage("second"),
+        SendMessage("first"), SendMessage("second"),
+    ]
