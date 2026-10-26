@@ -50,29 +50,29 @@ var username.str = "Alex"
 var attempts.int = 3
 var ratio.float = 1.5
 var enabled.bool = True
-var target.user.id = ""
+var target.user.id = None
 var channels.list = ()
 var configuration.dict = []
 var wait.time = 10
 set essais = 4
 ```
 
-`""` signifie vide/non renseigné lors de l'initialisation, y compris pour les types autres que `str`. Une liste vide s'écrit `()`, un dictionnaire vide `[]`. `set nom = valeur` modifie une variable existante, sans répéter son type ; une valeur incompatible produit une erreur de type.
+`None` signifie qu’aucune valeur n’est définie. Il peut initialiser une variable typée en attente d’une valeur, notamment un identifiant Discord. `""` reste une chaîne vide de type `str`. Une liste vide s'écrit `()`, un dictionnaire vide `[]`. `set nom = valeur` modifie une variable existante, sans répéter son type ; une valeur incompatible produit une erreur de type.
 
 ## Opérateurs et expressions
 
 Arithmétique : `+`, `-`, `*`, `/`, `%`.
 
-Compareason : `==`, `!=`, `<`, `>`, `<=`, `>=`. Les types comparés doivent être compatibles.
+Comparisons : `==`, `!=`, `<`, `>`, `<=`, `>=`. Les types comparés doivent être compatibles.
 
 Logique : `&&` signifie ET, `!!` signifie OU et `#` signifie NON. Les parenthèses regroupent les expressions. Les priorités suivent les règles usuelles des expressions.
 
 ## Conditions
 
 ```text
-if (essais >= 3 && actif == True) {
+if (attempts >= 3 && enabled == True) {
     @send("Conditions met");
-} elif (essais > 0) {
+} elif (attempts > 0) {
     @send("More attempts");
 } else {
     @send("No attempts remaining");
@@ -97,14 +97,14 @@ for i in range(0, 5) {
 }
 ```
 
-`repeat(n)` répète le bloc n fois. `for variable in collection` parcourt une collection. `range(debut, fin)` inclut le début et exclut la fin : `range(0, 5)` produit 0 à 4. Les collections Discord doivent être parcourues sur un instantané stable si le script les modifie.
+`repeat(n)` répète le bloc n fois. `for variable in collection` parcourt une collection. `range(debut, fin)` inclut le début et exclut la fin : `range(0, 5)` produit 0 à 4. Discord collections should be iterated over a stable snapshot if the script modifies them.
 
 ## Chaînes formatées
 
 ```text
 var username.str = "Alex"
 var score.int = 12
-@send(f"Player: {pseudo}, score: {score}");
+@send(f"Player: {username}, score: {score}");
 @send(f"Prochain score: {score + 1}");
 ```
 
@@ -116,26 +116,26 @@ Les listes utilisent des parenthèses, les positions commencent à zéro :
 
 ```text
 var numbers.list = (10, 20, 30)
-add nombres.list = {1, 15}
-set nombres.list = {0, 5}
-del nombres.list = 2
+add numbers.list = (1, 15)
+set numbers.list = (0, 5)
+del numbers.list = 2
 ```
 
-- `add liste = {position, valeur}` insère une valeur.
-- `set liste = {position, valeur}` remplace un élément.
-- `del liste = position` supprime un élément.
+- `add list = (position, value)` inserts a value.
+- `set list = (position, value)` replaces an element.
+- `del list = position` deletes an element.
 
 Les dictionnaires utilisent des crochets et des paires clé/valeur :
 
 ```text
 var config.dict = ["mode": "test", "active": True]
-add config.dict = {"langue", "fr"}
-set config.dict.value = {"mode", "production"}
-set config.dict.key = {"langue", "locale"}
+add config.dict = ("language", "en")
+set config.dict.value = ("mode", "production")
+set config.dict.key = ("language", "locale")
 del config.dict = "active"
 ```
 
-Les clés/positions doivent être valides. Un renommage de clé ne doit pas écraser une clé existante.
+Dictionary deletion is performed by key only, never by position. Keys and positions must be valid. Renaming a key must not overwrite an existing key.
 
 ## Entrées user
 
@@ -144,8 +144,8 @@ Une entrée est déclarée avec `.input` suivi du type attendu et de la question
 ```text
 var username.input{str, "What is your username?"} = ""
 var age.input{int, "How old are you?"} = ""
-var actif.input{bool, "Enable this feature?"} = False
-var cible.input{user.id, "What is the Discord ID?"} = ""
+var enabled.input{bool, "Enable this feature?"} = False
+var target.input{user.id, "What is the Discord ID?"} = None
 ```
 
 Types pris en charge par les entrées : `str`, `int`, `float`, `bool`, `user.id`, `channel.id`, `category.id`, `role.id` et `message.id`. Les entrées de type liste et dictionnaire ne sont pas prises en charge.
@@ -158,7 +158,7 @@ Fonctionnement prévu :
 4. Le délai d'attente est d'une minute.
 5. En cas de réponse invalide ou de délai dépassé, le script s'arrête. Il n'y a pas de seconde tentative dans la même exécution : il faut relancer le script.
 
-Une entrée booléenne doit permettre d'obtenir `True` ou `False`.
+For boolean input, accepted answers are `true`/`false`, `yes`/`no`, `oui`/`non`, and `1`/`0` (case-insensitive). They are converted to `True` or `False`.
 
 ## Objets et collections Discord
 
@@ -168,16 +168,16 @@ Une entrée booléenne doit permettre d'obtenir `True` ou `False`.
 - `guild.channel` : channels du serveur.
 - `guild.role` : rôles du serveur.
 
-Sans propriété, une collection ou un objet ciblé par défaut représente son identifiant. Une propriété explicite permet d'accéder à une autre donnée.
+Without a property, a collection or object defaults to its identifier. Une propriété explicite permet d'accéder à une autre donnée.
 
 ### Propriétés
 
 | Objet | Propriétés prévues |
 |---|---|
 | Utilisateur/member | `.id`, `.name`, `.display_name`, `.bot`, `.role` |
-| Salon (`channel`) | `.id`, `.name`, `.category`, `.perm`, `.slowmode`, `.type` |
-| Catégorie | `.id`, `.name`, `.perm` |
-| Rôle | `.id`, `.name`, `.color`, `.perm`, `.position`, `.managed` |
+| Salon (`channel`) | `.id`, `.name`, `.category`, `.permissions`, `.slowmode`, `.type` |
+| Catégorie | `.id`, `.name`, `.permissions` |
+| Rôle | `.id`, `.name`, `.color`, `.permissions`, `.position`, `.managed` |
 | Message | `.id`, `.content`, `.author`, `.channel` |
 
 La disponibilité exacte d'une propriété doit être vérifiée dans l'implémentation du bot et dépend de l'objet Discord. Le langage ne donne pas accès à des attributs Python arbitraires.
@@ -219,18 +219,17 @@ Tous les appels de fonctions commencent par `@`. Seules les fonctions répertori
 | `@mute(user, durée, reason?)` | Utilisateur, durée, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
 | `@unmute(user, reason?)` | Utilisateur, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
 
-### Salons et categorys
+### Channels and categories
 
 | Fonction | Rôle |
 |---|---|
-| `@create_chanel(nom, perm?, categorie?)` | Crée un channel et doit renvoyer son identifiant `channel.id` en cas de succès. |
-| `@delete_chanel(id, reason?)` | Supprime un channel. |
-| `@set_chanel.name{chanel_id, nom}` | Modifie le nom d'un channel. |
-| `@set_chanel.color{chanel_id, color}` | Modifie une color lorsque cette propriété s'applique à la cible. |
-| `@set_chanel.perm{chanel_id, permission:True;autre_permission:False}` | Modifie une ou plusieurs permissions du channel. |
-| `@slowmode(chanel, seconds)` | Configure le mode lent du channel. |
-| `@lock(chanel)` | Verrouille le channel selon les permissions Discord. |
-| `@unlock(chanel)` | Retire le verrouillage appliqué par le bot. |
+| `@create_channel(name, permissions?, category?)` | Crée un channel et doit renvoyer son identifiant `channel.id` en cas de succès. |
+| `@delete_channel(id, reason?)` | Supprime un channel. |
+| `@set_channel.name(channel_id, name)` | Modifie le nom d'un channel. |
+| `@set_channel.permissions(channel_id, permission:True;other_permission:False)` | Modifie une ou plusieurs permissions du channel. |
+| `@slowmode(channel, seconds)` | Configure le mode lent du channel. |
+| `@lock(channel)` | Verrouille le channel selon les permissions Discord. |
+| `@unlock(channel)` | Retire le verrouillage appliqué par le bot. |
 
 ### Rôles
 
@@ -238,19 +237,19 @@ Tous les appels de fonctions commencent par `@`. Seules les fonctions répertori
 |---|---|
 | `@create_role(nom, color?, perm?)` | Crée un rôle et doit renvoyer son identifiant `role.id` en cas de succès. |
 | `@delete_role(id, reason?)` | Supprime un rôle. |
-| `@set_role.name{role_id, nom}` | Modifie le nom d'un rôle. |
-| `@set_role.color{role_id, "#RRGGBB"}` | Modifie la color d'un rôle. |
-| `@set_role.perm{role_id, permission:True;autre_permission:False}` | Modifie une ou plusieurs permissions du rôle. |
-| `@give_role(user, role)` | Attribue un rôle à un user. |
+| `@set_role.name(role_id, name)` | Modifie le nom d'un rôle. |
+| `@set_role.color(role_id, "#RRGGBB")` | Modifie la color d'un rôle. |
+| `@set_role.permissions(role_id, permission:True;other_permission:False)` | Modifie une ou plusieurs permissions du rôle. |
+| `@add_role(user, role)` | Attribue un rôle à un user. |
 
-Pour `.perm`, chaque permission reçoit `True` ou `False`. Plusieurs changements peuvent être séparés par des points-virgules. Les noms de permissions acceptés doivent correspondre aux permissions Discord prises en charge par le bot.
+For `.permissions`, each permission receives `True` ou `False`. Plusieurs changements peuvent être séparés par des points-virgules. Les noms de permissions acceptés doivent correspondre aux permissions Discord prises en charge par le bot.
 
 ### Messages
 
 | Fonction | Rôle |
 |---|---|
 | `@send(message)` | Envoie un message dans le channel où le script a été lancé. |
-| `@send(chanel, message)` | Envoie un message dans le channel indiqué. |
+| `@send(channel, message)` | Envoie un message dans le channel indiqué. |
 | `@dm(user, message)` | Envoie un message privé à l'user. |
 | `@clear(nombre)` | Supprime le nombre de messages indiqué, dans les limites imposées par Discord. |
 
@@ -271,10 +270,10 @@ Le type `time` représente une durée. Sans suffixe, la valeur est exprimée en 
 Les suffixes ne sont pas sensibles à la casse.
 
 ```text
-var court.time = 30sec
+var short.time = 30sec
 var standard.time = 10
 var long.time = 2h
-@mute(cible, standard, "Spam");
+@mute(target, standard, "Spam");
 ```
 
 Ici, `standard` vaut dix minutes. Les durées doivent être valides et positives pour les actions qui exigent une durée.
@@ -302,8 +301,8 @@ var username.input{str, "What is your username?"} = ""
 var warnings.int = 0
 var enabled.bool = True
 
-if (actif == True) {
-    @send(f"Welcome {pseudo} !");
+if (enabled == True) {
+    @send(f"Welcome {username}!");
 }
 
 for role in guild.role {
@@ -313,10 +312,10 @@ for role in guild.role {
 }
 
 repeat(3) {
-    set avertissements = avertissements + 1
+    set warnings = warnings + 1
 }
 
-@send(f"Number of checks : {avertissements}");
+@send(f"Number of checks: {warnings}");
 ```
 
 ---
