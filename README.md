@@ -57,13 +57,13 @@ else:
 
 Nested blocks are supported, and indentation must be consistent. Blocks cannot be empty.
 
-Counted loops can define a 1-based counter with `repeat 3 as i: ...`. For example:
+Counted loops can define a 1-based counter with `repeat 3 as i: ...`, or use Python-style `for i in range(start, stop): ...` (start included, stop excluded). Both forms support indentation and nested instructions, with a maximum of 10 iterations per loop. Example:
 
 ```text
 repeat 3 as i: send(f"{create_role('role {i}')}")
 ```
 
-This creates `role 1`, `role 2`, and `role 3`, then sends each created role's mention.
+This creates `role 1`, `role 2`, and `role 3`, then sends each created role's mention. The second example creates three categories and a text channel in each one. Random values are available with `let roll = randint(1, 6)` or `send(f\"Roll: {randint(1, 6)}\")`; both bounds are inclusive and limited to integers between -1,000,000,000 and 1,000,000,000.
 
 Compact:
 
