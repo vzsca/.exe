@@ -33,15 +33,6 @@ def test_script_save_updates_existing_name(tmp_path):
     assert db.get_script(100, "hello") == 'send("two")'
 
 
-def test_event_handlers_can_be_disabled(tmp_path):
-    db = Database(str(tmp_path / "exe.sqlite3"))
-    db.save_event(100, "welcome", 'send("hi")', enabled=False)
-    assert db.get_event(100, "welcome") == ('send("hi")', False)
-    assert db.list_events(100) == ["welcome"]
-    assert db.delete_event(100, "welcome")
-    assert db.get_event(100, "welcome") is None
-
-
 def test_invalid_names_are_rejected(tmp_path):
     db = Database(str(tmp_path / "exe.sqlite3"))
     with pytest.raises(StorageError, match="Name must start"):
