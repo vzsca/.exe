@@ -455,7 +455,7 @@ def build_bot(settings: Settings) -> ExeBot:
                         if len(answer.content) > 1800:
                             raise ScriptError("Input response is too long (maximum 1800 characters).")
                         # User input is plain text and must never trigger role pings.
-                        runtime_variables[action.name] = answer.content.replace("@", "@\u200b")
+                        runtime_variables[action.name] = answer.content
                     elif isinstance(action, SendMessage):
                         target = ctx.channel
                         if action.channel is not None:
@@ -468,7 +468,9 @@ def build_bot(settings: Settings) -> ExeBot:
                                 raise ScriptError("Could not find the target text channel by ID or exact name.")
                         content = action.text
                         for variable_name, variable_value in runtime_variables.items():
-                            content = content.replace(f"__EXE_VAR_{variable_name}__", variable_value)
+                            # Keep input values intact for comparisons, but neutralize mentions at send time.
+                            safe_value = variable_value.replace("@", "@\u200b")
+                            content = content.replace(f"__EXE_VAR_{variable_name}__", safe_value)
                         allowed_roles = []
                         if action.role_mentions:
                             if ctx.guild is None:
