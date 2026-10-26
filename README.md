@@ -107,6 +107,7 @@ GitHub Actions runs tests on pushes and pull requests. The tests use mocked Disc
 ## Documentation and policies
 
 - [Language reference](docu.md)
+- [Repository audit and code/documentation comparison](AUDIT.md)
 - [Privacy policy template](PRIVACY_POLICY.md)
 - [Terms of use template](TERMS_OF_USE.md)
 - [MIT license](LICENSE)
