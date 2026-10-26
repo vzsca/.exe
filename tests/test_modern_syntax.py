@@ -42,7 +42,7 @@ def test_canonical_english_action_names_are_supported():
 def test_typed_input_declaration_uses_input_instruction():
     program = parse_script(
         'var username.input{str, "What is your username?"} = "";\n'
-        '@send(f"Hello {username}!")'
+        '@send(f"Hello {username}!");'
     )
     assert isinstance(program[0], InputVariable)
     assert program[0].name == "username"
@@ -51,7 +51,7 @@ def test_typed_input_declaration_uses_input_instruction():
 
 def test_unknown_declared_type_is_rejected():
     with pytest.raises(ScriptError, match="Unknown variable type"):
-        parse_script('var value.unknown = "x"\n@send(value)')
+        parse_script('var value.unknown = "x"; @send(value);')
 
 
 def test_unclosed_brace_is_rejected():
@@ -83,7 +83,7 @@ def test_safe_expression_rejects_function_calls():
 
 
 def test_boolean_and_none_literals_are_preserved():
-    program = parse_script('var enabled.bool = True; var target.user.id = None; @send("ready")')
+    program = parse_script('var enabled.bool = True; var target.user.id = None; @send("ready");')
     assert program[0].value is True
     assert program[1].value is None
 
@@ -95,3 +95,27 @@ def test_missing_semicolon_is_rejected():
 def test_legacy_send_syntax_is_rejected():
     with pytest.raises(ScriptError, match="must start with @"):
         parse_script('send("Hello");')
+
+def test_multiple_statements_on_one_line_are_supported():
+    program = parse_script('var count.int = 1; set count = count + 2; @send(f"{count}");')
+    assert expand_actions(program) == [SendMessage("3")]
+
+
+def test_newlines_after_semicolons_are_optional():
+    program = parse_script('var count.int = 1;\nset count = count + 1;\n@send(f"{count}");')
+    assert expand_actions(program) == [SendMessage("2")]
+
+
+def test_missing_semicolon_before_closing_brace_is_rejected():
+    with pytest.raises(ScriptError, match="must end with"):
+        parse_script('if (True == True) { @send("missing") }')
+
+
+def test_legacy_native_call_inside_a_line_is_rejected():
+    with pytest.raises(ScriptError, match="start with"):
+        parse_script('var x.str = "ok"; send(x);')
+
+
+def test_semicolon_inside_string_is_not_a_separator():
+    program = parse_script('@send("one; two");')
+    assert expand_actions(program) == [SendMessage("one; two")]
