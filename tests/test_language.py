@@ -266,3 +266,27 @@ def test_repeat_block_keeps_all_actions_in_each_iteration():
         SendMessage("first"), SendMessage("second"),
         SendMessage("first"), SendMessage("second"),
     ]
+
+
+
+def test_fstring_accepts_nested_create_role_call_with_double_quotes():
+    source = 'var test.int = 10; repeat(3){@send(f"{test}{@create_role("role","#FF0000",administrator:True)}");}'
+    program = parse_script(source)
+    actions = expand_actions(program)
+    assert len(actions) == 6
+    assert all(isinstance(action, DiscordAction) for action in actions[0::2])
+    assert all(action.name == "create_role" for action in actions[0::2])
+    assert all(action.arguments == ("role", "#FF0000", "administrator") for action in actions[0::2])
+    assert all(isinstance(action, SendMessage) for action in actions[1::2])
+    assert all(action.text.startswith("10__EXE_VAR___exe_result_") for action in actions[1::2])
+
+
+def test_role_id_type_is_declared_after_variable_name():
+    program = parse_script('var new_role.role.id = None; @send("ready");')
+    assert program[0].name == "new_role"
+    assert program[0].value is None
+
+
+def test_create_role_result_requires_role_id_type():
+    with pytest.raises(ScriptError, match="role.id"):
+        parse_script('var new_role.id = None; set new_role = @create_role("role");')
