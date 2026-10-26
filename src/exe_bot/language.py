@@ -7,6 +7,7 @@ are evaluated through an explicit AST allowlist; no Python code is executed.
 
 from dataclasses import dataclass
 import ast
+import math
 import re
 import random
 
@@ -199,7 +200,7 @@ def _safe_expression(source: str, variables: dict[str, object]) -> object:
         result = _eval_expression(parsed.body, variables)
         if isinstance(result, int) and not isinstance(result, bool) and result.bit_length() > 4096:
             raise ValueError("numeric result is too large")
-        if isinstance(result, float) and not __import__("math").isfinite(result):
+        if isinstance(result, float) and not math.isfinite(result):
             raise ValueError("numeric result must be finite")
         return result
     except (SyntaxError, ValueError, TypeError, ZeroDivisionError, OverflowError, KeyError, IndexError, RecursionError) as exc:
