@@ -26,7 +26,7 @@ HELP_TEXT = (
     'Moderation: @ban(user_id, "reason"); @kick(user_id, "reason"); @unban(user_id); @mute(user_id, 10); @unmute(user_id);\\n'
     'Roles: @create_role("name"); @add_role(user_id, role); @remove_role(user_id, role); @delete_role(id_or_exact_name);\\n'
     'Channels: @create_channel("name"); @delete_channel(id_or_exact_name); @slowmode(seconds); @clear(count);\\n'
-    'Messages: @send("message"); @send("message", "#channel"); @dm(user_id, "message");\\n'
+    'Messages: @send("message"); @send("message", "#channel"); \\n'
     'Compact syntax and native calls without @ are not supported. Only whitelisted users may run scripts; Discord permissions and role hierarchy still apply.\\n'
     'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.'
 )
