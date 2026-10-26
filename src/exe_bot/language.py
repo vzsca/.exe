@@ -193,6 +193,7 @@ def _split_arguments(source: str) -> list[str]:
     current: list[str] = []
     quote: str | None = None
     escaped = False
+    paren_depth = 0
     for char in source:
         if escaped:
             current.append(char)
@@ -207,13 +208,22 @@ def _split_arguments(source: str) -> list[str]:
                 quote = char
             elif quote == char:
                 quote = None
-        if char == "," and quote is None:
+        elif quote is None:
+            if char == "(":
+                paren_depth += 1
+            elif char == ")":
+                if paren_depth == 0:
+                    raise ScriptError("Unexpected closing parenthesis in function arguments")
+                paren_depth -= 1
+        if char == "," and quote is None and paren_depth == 0:
             parts.append("".join(current).strip())
             current = []
         else:
             current.append(char)
     if quote:
         raise ScriptError("Unclosed quote in function arguments")
+    if paren_depth:
+        raise ScriptError("Unclosed parenthesis in function arguments")
     if current or source.strip():
         parts.append("".join(current).strip())
     return parts
@@ -313,6 +323,24 @@ def _parse_one(
         if not body:
             raise ScriptError(f"Line {line_number}: repeat body cannot be empty")
         return [Repeat(count, tuple(body))]
+
+    # Allow a freshly created role to be passed directly to give_role/remove_role.
+    role_assignment = re.fullmatch(r"(give_role|remove_role)\\((.*)\\)", statement)
+    if role_assignment:
+        action_name, raw_arguments = role_assignment.groups()
+        parts = _split_arguments(raw_arguments)
+        if len(parts) == 2 and re.match(r"^create_role\\s*\\(", parts[1]):
+            member_action = _parse_discord_action(f"unban({parts[0]})", line_number, variables)
+            if member_action is None:
+                raise ScriptError(f"Line {line_number}: invalid member argument")
+            created_role = _parse_discord_action(parts[1], line_number, variables)
+            if created_role is None or created_role.name != "create_role":
+                raise ScriptError(f"Line {line_number}: expected create_role(...) as the role argument")
+            result_name = "__exe_result_0"
+            return [
+                DiscordAction("create_role", created_role.arguments, result_name),
+                DiscordAction(action_name, (member_action.arguments[0], f"__EXE_VAR_{result_name}__")),
+            ]
 
     action = _parse_discord_action(statement, line_number, variables)
     if action is not None:
