@@ -110,6 +110,12 @@ def _eval_expression(node: ast.AST, variables: dict[str, object]) -> object:
             return node.value
         raise ValueError("unsupported constant")
     if isinstance(node, ast.Name):
+        if node.id == "True":
+            return True
+        if node.id == "False":
+            return False
+        if node.id == "None":
+            return None
         if node.id not in variables:
             raise ValueError(f"unknown variable '{node.id}'")
         return variables[node.id]
