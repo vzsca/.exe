@@ -1,9 +1,10 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
-import pytest
 
 from exe_bot.bot import build_bot
 from exe_bot.config import Settings
@@ -39,7 +40,7 @@ class FakeMember:
         return str(self.id)
 
 
-def make_context(tmp_path, *, actor_position=10, bot_position=20, target_role_position=5):
+def make_context(database_path, *, actor_position=10, bot_position=20, target_role_position=5):
     actor_role = FakeRole(10, "Moderator", actor_position)
     bot_role = FakeRole(20, "Bot", bot_position)
     target_role = FakeRole(30, "Helpers", target_role_position)
@@ -63,53 +64,57 @@ def make_context(tmp_path, *, actor_position=10, bot_position=20, target_role_po
         message=SimpleNamespace(add_reaction=AsyncMock()),
         reply=AsyncMock(),
     )
-    settings = Settings(token="test", owner_id=actor.id, database_path=str(tmp_path / "db.sqlite3"))
-    return ctx, target_role, target, build_bot(settings)
+    settings = Settings(token="test", owner_id=actor.id, database_path=str(database_path))
+    return ctx, target, build_bot(settings)
 
 
-@pytest.mark.asyncio
-async def test_role_hierarchy_rejects_role_at_or_above_bot(tmp_path):
-    ctx, _, target, bot = make_context(tmp_path, bot_position=5, target_role_position=5)
-    with patch("exe_bot.bot.discord.Member", FakeMember):
-        try:
-            await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
-            assert "bot's highest role must be above" in ctx.reply.await_args.args[0]
-            target.add_roles.assert_not_awaited()
-        finally:
-            await bot.close()
+class DiscordActionTests(IsolatedAsyncioTestCase):
+    async def test_role_hierarchy_rejects_role_at_or_above_bot(self):
+        with TemporaryDirectory() as directory:
+            ctx, target, bot = make_context(
+                Path(directory) / "db.sqlite3", bot_position=5, target_role_position=5
+            )
+            with patch("exe_bot.bot.discord.Member", FakeMember):
+                try:
+                    await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
+                    self.assertIn("bot's highest role must be above", ctx.reply.await_args.args[0])
+                    target.add_roles.assert_not_awaited()
+                finally:
+                    await bot.close()
 
+    async def test_role_hierarchy_rejects_role_at_or_above_actor(self):
+        with TemporaryDirectory() as directory:
+            ctx, target, bot = make_context(
+                Path(directory) / "db.sqlite3", actor_position=5, bot_position=20, target_role_position=5
+            )
+            with patch("exe_bot.bot.discord.Member", FakeMember):
+                try:
+                    await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
+                    self.assertIn("Your highest role must be above", ctx.reply.await_args.args[0])
+                    target.add_roles.assert_not_awaited()
+                finally:
+                    await bot.close()
 
-@pytest.mark.asyncio
-async def test_role_hierarchy_rejects_role_at_or_above_actor(tmp_path):
-    ctx, _, target, bot = make_context(tmp_path, actor_position=5, bot_position=20, target_role_position=5)
-    with patch("exe_bot.bot.discord.Member", FakeMember):
-        try:
-            await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
-            assert "Your highest role must be above" in ctx.reply.await_args.args[0]
-            target.add_roles.assert_not_awaited()
-        finally:
-            await bot.close()
+    async def test_discord_forbidden_is_reported_without_leaking_exception(self):
+        with TemporaryDirectory() as directory:
+            ctx, target, bot = make_context(Path(directory) / "db.sqlite3")
+            target.add_roles.side_effect = discord.Forbidden(MagicMock(status=403), "missing permission")
+            with patch("exe_bot.bot.discord.Member", FakeMember):
+                try:
+                    await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
+                    self.assertIn("Discord refused 'give_role'", ctx.reply.await_args.args[0])
+                finally:
+                    await bot.close()
 
-
-@pytest.mark.asyncio
-async def test_discord_forbidden_is_reported_without_leaking_exception(tmp_path):
-    ctx, _, target, bot = make_context(tmp_path)
-    target.add_roles.side_effect = discord.Forbidden(MagicMock(status=403), "missing permission")
-    with patch("exe_bot.bot.discord.Member", FakeMember):
-        try:
-            await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
-            assert "Discord refused 'give_role'" in ctx.reply.await_args.args[0]
-        finally:
-            await bot.close()
-
-
-@pytest.mark.asyncio
-async def test_discord_http_error_is_reported_to_script_author(tmp_path):
-    ctx, _, target, bot = make_context(tmp_path)
-    target.add_roles.side_effect = discord.HTTPException(MagicMock(status=500), "temporary API failure")
-    with patch("exe_bot.bot.discord.Member", FakeMember):
-        try:
-            await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
-            assert "Discord rejected an action" in ctx.reply.await_args.args[0]
-        finally:
-            await bot.close()
+    async def test_discord_http_error_is_reported_to_script_author(self):
+        with TemporaryDirectory() as directory:
+            ctx, target, bot = make_context(Path(directory) / "db.sqlite3")
+            target.add_roles.side_effect = discord.HTTPException(
+                MagicMock(status=500), "temporary API failure"
+            )
+            with patch("exe_bot.bot.discord.Member", FakeMember):
+                try:
+                    await bot.get_command("exe").callback(ctx, script='@add_role("456", "Helpers");')
+                    self.assertIn("Discord rejected an action", ctx.reply.await_args.args[0])
+                finally:
+                    await bot.close()
