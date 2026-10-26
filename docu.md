@@ -90,10 +90,10 @@ Native calls must start with @.
 | @untimeout(user) | 1 | Remove a timeout. |
 | @give_role(user, role) / @add_role(user, role) | 2 | Assign a role. |
 | @remove_role(user, role) | 2 | Remove a role. |
-| @create_role(name[, color[, permissions]]) | 1–3 | Create a role. Color is a six-digit hex value; permissions are a comma-separated allowlist. The administrator permission and other unsupported permissions are rejected. Assign the result to a `role.id` variable to reuse it. |
+| @create_role(name[, color[, permissions]]) | 1–3 | Create a role. Color is a six-digit hex value; permissions are a comma-separated allowlist. The administrator permission and other unsupported permissions are rejected. Assign the result to a `role.id` variable to reuse it. Creation calls can also be embedded directly in a send f-string with nested quoted arguments. |
 | @delete_role(role_id_or_name) | 1 | Delete a role by ID or exact name. |
-| @create_category(name[, permissions]) | 1–2 | Create a category, optionally with role permission overwrites. Assign the result to a `category.id` variable to reuse its ID. |
-| @create_channel(name[, category[, permissions]]) | 1–3 | Create a text channel, optionally in an existing category and with permission overwrites. Assign the result to a `channel.id` variable; using it in an f-string produces a channel mention. |
+| @create_category(name[, permissions]) | 1–2 | Create a category, optionally with role permission overwrites. Assign the result to a `category.id` variable to reuse its ID. A direct create call in a send f-string can include its new ID in the message. |
+| @create_channel(name[, category[, permissions]]) | 1–3 | Create a text channel, optionally in an existing category and with permission overwrites. Assign the result to a `channel.id` variable; using it in an f-string produces a channel mention. A direct create call inside a send f-string also produces a mention of the new channel. |
 | @delete_channel(channel_id_or_name) | 1 | Delete a text channel by ID or exact name. Categories are not accepted. |
 | @slowmode(seconds) | 1 | Set slowmode in the current text channel (0–21,600 seconds). |
 | @clear(count) | 1 | Delete 1–100 messages in the current text channel. |
