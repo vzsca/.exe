@@ -33,6 +33,7 @@ class SendMessage:
     text: str
     channel: str | None = None
     role_mentions: bool = False
+    channel_mentions: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -526,14 +527,17 @@ def _parse_one(
     if depth > _MAX_DEPTH:
         raise ScriptError(f"Line {line_number}: repeat nesting exceeds {_MAX_DEPTH} levels")
 
-    action_assignment = re.fullmatch(rf"set\s+({_NAME})\s*=\s*create_role\((.*)\)", statement)
+    action_assignment = re.fullmatch(
+        rf"set\s+({_NAME})\s*=\s*(create_role|create_channel|create_category)\((.*)\)",
+        statement,
+    )
     if action_assignment:
-        name, raw_arguments = action_assignment.groups()
+        name, action_name, raw_arguments = action_assignment.groups()
         if name not in variables:
             raise ScriptError(f"Line {line_number}: declare '{name}' with a typed variable before assigning a native action result")
-        action = _parse_discord_action(f"create_role({raw_arguments})", line_number, variables)
+        action = _parse_discord_action(f"{action_name}({raw_arguments})", line_number, variables)
         if action is None:
-            raise ScriptError(f"Line {line_number}: invalid create_role assignment")
+            raise ScriptError(f"Line {line_number}: invalid {action_name} assignment")
         return [DiscordAction(action.name, action.arguments, name)]
 
     match = _SET_STANDARD.fullmatch(statement) or _SET_COMPACT.fullmatch(statement)
@@ -1129,7 +1133,7 @@ def _normalize_modern_syntax(source: str) -> str:
                 stripped = f"let {name} = input({question})"
             else:
                 assign = re.fullmatch(r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)", stripped)
-                if assign and not re.fullmatch(r"@?create_role\s*\(.*\)", assign.group(2).strip()):
+                if assign and not re.fullmatch(r"@?(?:create_role|create_channel|create_category)\s*\(.*\)", assign.group(2).strip()):
                     stripped = f"let {assign.group(1)} = {assign.group(2)}"
 
         # Native calls require @ in the new syntax; the runtime registry remains allowlisted.
@@ -1311,10 +1315,16 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
         declared_types[declaration.group(1)] = declaration.group(2)
     def validate_declared_types(instruction: Instruction, line_number: int) -> None:
         if isinstance(instruction, DiscordAction) and instruction.result_variable and not instruction.result_variable.startswith("__exe_result_"):
+            expected_types = {
+                "create_role": "role.id",
+                "create_channel": "channel.id",
+                "create_category": "category.id",
+            }
+            expected_type = expected_types.get(instruction.name)
             declared_type = declared_types.get(instruction.result_variable)
-            if declared_type != "role.id":
+            if expected_type is None or declared_type != expected_type:
                 raise ScriptError(
-                    f"Line {line_number}: the result of create_role must be assigned to a variable declared as 'role.id'"
+                    f"Line {line_number}: the result of {instruction.name} must be assigned to a variable declared as '{expected_type or 'a matching Discord ID type'}'"
                 )
         elif isinstance(instruction, SetVariable) and instruction.name in declared_types:
             declared_type = declared_types[instruction.name]
@@ -1349,14 +1359,21 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
         role_id_names = {
             name for name, type_name in declared_types.items() if type_name == "role.id"
         }
+        channel_id_names = {
+            name for name, type_name in declared_types.items() if type_name == "channel.id"
+        }
         parsed = [
             SendMessage(
                 instruction.text,
                 instruction.channel,
-                True,
+                instruction.role_mentions or any(
+                    f"__EXE_VAR_{name}__" in instruction.text for name in role_id_names
+                ),
+                instruction.channel_mentions or any(
+                    f"__EXE_VAR_{name}__" in instruction.text for name in channel_id_names
+                ),
             )
             if isinstance(instruction, SendMessage)
-            and any(f"__EXE_VAR_{name}__" in instruction.text for name in role_id_names)
             else instruction
             for instruction in parsed
         ]
