@@ -1,223 +1,62 @@
-# `.exe` — Linux-inspired scripting for Discord
+# `.exe` — langage de scripts pour Discord
 
-`.exe` is a Discord bot project built from scratch. It provides the beginnings of a small, sandboxed scripting language for Discord actions, with two native syntaxes:
+`.exe` est un bot Discord Python qui propose un langage de script dédié aux actions Discord. Ce langage **n'est pas Python** : seules les instructions autorisées par le moteur sont acceptées.
 
-- **Standard**: readable and beginner-friendly.
-- **Compact**: shorter, symbol-heavy syntax for experienced users.
+## Source de vérité
 
-Both syntaxes compile into the same internal instruction types and use the same execution engine, permissions, limits, and security rules.
+La documentation du langage est dans **[`docu.md`](docu.md)**. Les exemples de ce README suivent sa syntaxe moderne : déclarations typées avec `var`, appels natifs préfixés par `@`, blocs entre accolades et point-virgule obligatoire après chaque instruction.
 
-## Current prototype
-
-Implemented:
-- `send("Hello")` / compact `m("Hello")` to send a message. An optional second argument targets a text channel by exact name or ID, e.g. `send("Hello", "#general")` or `send("Hello", "123456789012345678")`.
-- Discord actions: `ban`, `unban`, `kick`, `timeout`, `untimeout`, `give_role`, `remove_role`, `create_role`, `delete_role`, `create_category`, `create_channel`, `delete_channel`, `slowmode`, and `clear`.
-- Read-only server inventory in f-strings: `guilds_roles()`, `guilds_members()`, `guilds_channels()`, and `guilds_categories()`. Results include names and IDs; member results are capped at 100.
-- `let greeting = "Hello"` / compact `v(greeting, "Hello")` to define a text variable.
-- `send(greeting)` / compact `m(greeting)` to use a defined variable.
-- `send(f"Salut @Moderateurs")` allows an explicit role mention by exact role name or ID. F-strings only support literal text and defined variables such as `{greeting}`; they do not execute Python expressions. User and `@everyone` mentions remain blocked.
-- `repeat 3: send("Hello")` / compact `R(3, m("Hello"))` for bounded repetition.
-- `if greeting == "Hello": send("yes")` with an optional following `else: send("no")` line; compact `I(greeting, "Hello", m("yes"))` supports an optional following `E(m("no"))` line for the else branch.
-- Owner-ID and SQLite-backed whitelist access checks.
-- Owner-only whitelist management: `!exe admin add @user`, `!exe admin remove @user`, and `!exe admin list`.
-- SQLite tables for custom scripts, event handlers, and whitelist entries.
-- Limits on script size, action count, message size, repeat count/depth, and execution time.
-- Create and save named scripts directly in Discord after syntax validation.
-- List, run, and delete a user's own saved scripts; saved scripts are revalidated and use the same execution limits as direct scripts.
-- Script-generated messages cannot ping users or @everyone. Role pings are only allowed when explicitly written in an f-string using an exact role name or role ID; text collected through `input()` is escaped and cannot trigger role pings.
-- Automated parser and storage tests, plus a GitHub Actions test workflow.
-
-Still to build: richer values and expressions, event-handler commands and execution, and `sudo` verification.
-
-## Syntax examples
-
-Standard:
+## Exemple
 
 ```text
-let greeting = "Hello"
-send(greeting)
-repeat 3: send(greeting)
-if greeting == "Hello": send("Matched")
-else: send("Not matched")
+var greeting.str = "Hello";
+var count.int = 3;
+
+if (count >= 3) {
+    @send(f"{greeting}: {count}");
+} else {
+    @send("Not enough");
+}
+
+repeat(2) {
+    @send("Done");
+}
 ```
 
-The `else` must be on the next line immediately after its `if`. Standard `repeat`, `if`, and `else` blocks also support indentation and multiple instructions:
+Les retours à la ligne sont facultatifs **après** un `;`. Les instructions peuvent donc être enchaînées sur une seule ligne. Les accolades ouvrantes des blocs et les accolades fermantes ne prennent pas de point-virgule. Les syntaxes historiques (`let`, `send(...)` sans `@`, `m(...)`, `v(...)`, `R(...)`, `I(...)`, `E(...)`) ne font pas partie du langage moderne.
 
-```text
-let mode = "safe"
-repeat 2:
-    send("Starting")
-    send("Still running")
-if mode == "admin":
-    send("Admin mode")
-    send("Second admin message")
-else:
-    send("Safe mode")
+## Utilisation du bot
+
+- `!exe <script>` — compile puis exécute un script.
+- `!exe create <name> :: <script>` — valide et enregistre un script.
+- `!exe list` — liste tes scripts enregistrés.
+- `!exe run <name>` — exécute l'un de tes scripts.
+- `!exe delete <name>` — supprime l'un de tes scripts.
+- `!exe admin add @user`, `!exe admin remove @user`, `!exe admin list` — commandes réservées au propriétaire configuré.
+
+Seuls les utilisateurs autorisés par la whitelist peuvent lancer ou gérer leurs scripts. Les actions Discord restent soumises aux permissions effectives et à la hiérarchie des rôles.
+
+## Installation
+
+Python 3.12 ou plus récent est requis.
+
+```sh
+python -m venv .venv
+# Linux/macOS
+source .venv/bin/activate
+# Windows PowerShell : .venv\Scripts\Activate.ps1
+python -m pip install -e .
 ```
 
-Nested blocks are supported, and indentation must be consistent. Blocks cannot be empty.
+Copie `.env.example` vers `.env`, renseigne `DISCORD_TOKEN` et `OWNER_ID`, puis démarre le bot avec la commande de lancement du projet.
 
-Counted loops can define a 1-based counter with `repeat 3 as i: ...`, or use Python-style `for i in range(start, stop): ...` (start included, stop excluded). Both forms support indentation and nested instructions, with a maximum of 10 iterations per loop. Example:
+## Tests
 
-```text
-repeat 3 as i: send(f"{create_role('role {i}')}")
-for i in range(1, 4):
-    create_category("Test-{i}")
-    create_channel("annonces-test-{i}", "Test-{i}")
+```sh
+python -m pip install -e . pytest
+python -m pytest
 ```
 
-This creates `role 1`, `role 2`, and `role 3`, then sends each created role's mention. The second example creates three categories and a text channel in each one. Random values are available with `let roll = randint(1, 6)` or `send(f\"Roll: {randint(1, 6)}\")`; both bounds are inclusive and limited to integers between -1,000,000,000 and 1,000,000,000.
+## Sécurité et limites
 
-Compact:
-
-```text
-v(greeting, "Hello")
-m(greeting)
-R(3, m(greeting))
-I(greeting, "Hello", m("Matched"))
-E(m("Not matched"))
-
-Compact one-liner: `v(greeting, "Hello")§m(greeting)§R(3, m(greeting))`
-
-Compact loops and conditions can now contain multiple instructions separated by `§`:
-
-```text
-R(2, m("Starting")§create_role("Tester", "#5865F2", "view_channel, send_messages"))
-v(mode, "safe")
-I(mode, "safe", m("Allowed")§create_category("Safe-zone"))
-```
-
-Separators inside a quoted string remain literal text. The loop count and total action budget are still enforced, including for nested loops.
-```
-
-For multiple instructions in Discord, send a fenced code block after `!exe`. Semicolons or `§` can also separate top-level instructions on a single line; `§` is the compact syntax separator and behaves like a newline outside quoted text. Inside compact `R(...)` and `I(...)` calls, use `§` to separate the nested instructions.
-
-### Discord action examples
-
-```text
-ban("123456789012345678", "Spam")
-unban("123456789012345678")
-kick("123456789012345678", "Spam")
-timeout("123456789012345678", 10)
-untimeout("123456789012345678")
-give_role("<@123456789012345678>", "<@&987654321098765432>")
-remove_role("<@123456789012345678>", "<@&987654321098765432>")
-create_role("Helpers")
-create_role("Moderators", "#5865F2", "view_channel, send_messages, manage_messages, kick_members")
-give_role("<@123456789012345678>", create_role("Helpers", "#5865F2", "view_channel, send_messages"))
-remove_role("<@123456789012345678>", create_role("Temporary", "#ED4245", "view_channel"))
-delete_role("123456789012345678")
-create_channel("welcome")
-create_channel("staff", "Staff")
-create_channel("private", "Staff", "@everyone:view_channel=deny, Moderators:view_channel=allow, Moderators:send_messages=allow")
-delete_channel("123456789012345678")
-slowmode(5)
-clear(25)
-```
-
-For `create_category`, the category name is required; an optional second argument defines category permission overwrites using comma-separated `target:permission=allow|deny` entries. The category is created directly by the bot, and channels placed inside it inherit its permissions when no custom channel overwrites are supplied. For `create_channel`, the channel name is required. The optional second argument is an existing category name or ID. The optional third argument defines permission overwrites as comma-separated `target:permission=allow|deny` entries. Use `@everyone` or an existing role name/ID as the target, and supported channel permissions such as `view_channel`, `send_messages`, `read_message_history`, `manage_messages`, `connect`, or `speak`. Example: `create_channel("private", "Staff", "@everyone:view_channel=deny, Moderators:view_channel=allow")`. If a category is provided without custom overwrites, the new channel inherits that category's permissions.
-
-You can nest `create_role(...)` directly as the second argument of `give_role` or `remove_role`; the role's name, color, and permissions use the same arguments as a standalone creation. The role is created first, then its new ID is passed to the assignment/removal action. For example, `give_role("<@123456789012345678>", create_role("Helpers", "#5865F2", "view_channel, send_messages"))`. Removing a just-created role is syntactically supported but usually makes no practical sense unless the member already has that newly created role.
-
-For `create_role`, the name is required; color and permissions are optional. Use a six-digit hex color (for example `"#5865F2"`) and a comma-separated permission string (for example `"view_channel, send_messages, manage_messages"`). Supported permissions are `view_channel`, `send_messages`, `read_message_history`, `embed_links`, `attach_files`, `add_reactions`, `use_external_emojis`, `connect`, `speak`, `stream`, `use_voice_activation`, `manage_messages`, `manage_nicknames`, `kick_members`, `ban_members`, `moderate_members`, and `view_audit_log`. High-risk permissions, including `administrator`, are intentionally not supported.
-
-These actions require the matching native Discord permission from both the user running the script and the bot. `give_role(user_id_or_mention, role_id_name_or_mention)` assigns an existing role to a server member; `remove_role(user_id_or_mention, role_id_name_or_mention)` removes it. Both accept a user ID or mention (`"123..."` or `"<@123...>"`) and a role ID, exact name, or role mention (`"123..."`, `"Moderators"`, or `"<@&123...>"`). Both require Manage Roles and check that the role is below the actor’s and bot’s highest roles. Role hierarchy is also checked for member moderation and role deletion. IDs or exact role/channel names are accepted for deletion; user targets should be Discord IDs. `timeout` duration is 1–40320 minutes, `slowmode` is 0–21600 seconds, and `clear` is limited to 1–100 recent messages. These functions only work in a server. Use them carefully: role/channel deletion and message clearing are destructive.
-
-## Security principles
-
-- No `eval`, `exec`, arbitrary Python, OS shell access, or unrestricted file access.
-- Scripts can only call explicitly registered language instructions/actions.
-- Owner identity is verified using `OWNER_ID`, not server Administrator permissions.
-- Whitelist membership grants permission to run scripts, not owner privileges.
-- Whitelist changes are persisted in SQLite and are only available to the configured owner.
-- Secrets belong in `.env`, never in source control.
-- Script execution has configured time and action limits.
-
-## Requirements and setup
-
-- Python 3.12 or newer
-- A Discord bot application and token
-
-1. Clone the repository and enter its folder.
-2. On Windows, run `start_bot.bat`; on Linux/macOS, run `chmod +x start_bot.sh && ./start_bot.sh`.
-3. The launcher creates `venv`, installs dependencies, and copies `.env.example` to `.env` if needed.
-4. In the panel, use `set_token` and `set_owner` to configure the bot. The token is entered with hidden input.
-5. In the Discord Developer Portal, enable **Message Content Intent** and **Server Members Intent**. The latter is required by `guilds_members()`.
-6. Use `start`, `stop`, `restart`, `status`, or `uptime` in the panel. Logs are available with `logs`.
-
-The SQLite file is created automatically at `DATABASE_PATH` (default: `data/exe.sqlite3`).
-
-Run tests with `python -m pip install -r requirements-dev.txt`, then `python -m pytest`.
-
-## Discord commands
-
-Only the configured owner and whitelisted users can use script commands.
-
-- `!exe <script>` — run a script immediately.
-- `!exe create <name> :: <script>` — validate and save a named script without running it.
-- `!exe list` — list your saved scripts.
-- `!exe run <name>` — run one of your saved scripts.
-- `!exe delete <name>` — delete one of your saved scripts.
-- `!help_exe` — show command and syntax help.
-- `!exe admin add @user`, `!exe admin remove @user`, `!exe admin list` — owner-only whitelist management.
-
-Example: `!exe create hello :: let greeting = "Hello"; send(greeting)`.
-
-Each saved script is private to the Discord user who created it; the commands do not let users run or delete another user's scripts.
- 
-## Security note
-
-A one-time code sent through Discord DM adds a confirmation step, but it is not independent multi-factor authentication if the Discord account itself is compromised. Sensitive actions must still require strict owner checks and short-lived, single-use challenges.
-
-## Legal documents
-
-- [Conditions d’utilisation](TERMS_OF_USE.md)
-- [Politique de confidentialité](PRIVACY_POLICY.md)
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
-
-### Inputs interactifs
-
-Un script peut demander une réponse à la personne qui l'exécute. Le bot envoie la question dans le salon, puis attend le prochain message de cette même personne dans ce salon :
-
-```python
-let pseudo = input("Quel est ton pseudo ?")
-send(f"Bienvenue {pseudo} !")
-```
-
-La réponse est limitée à 1 800 caractères et l'attente est limitée par `SCRIPT_TIMEOUT_SECONDS`. Les réponses des autres membres ne sont pas utilisées.
-
-
-### Inventaire du serveur
-
-Ces fonctions en lecture seule affichent les noms et ID du serveur courant :
-
-```text
-send(f"Rôles : {guilds_roles()}")
-send(f"Membres : {guilds_members()}")
-send(f"Salons : {guilds_channels()}")
-send(f"Catégories : {guilds_categories()}")
-```
-
-La liste des membres est limitée à 100 résultats. Active **Server Members Intent** dans le portail développeur Discord puis redémarre le bot.
-
-### Listes et dictionnaires
-
-Les variables peuvent contenir des listes et des dictionnaires simples, avec accès par index ou clé dans les f-strings :
-
-```python
-let users = ["Alice", "Bob"]
-let config = {"prefix": "!exe", "mode": "safe"}
-send(f"Premier : {users[0]} | Préfixe : {config['prefix']}")
-```
-
-Créer un rôle puis afficher sa mention directement :
-
-```python
-send(f"Rôle créé : {create_role('Testeurs')}")
-```
-
-La création de rôle vérifie les permissions Discord habituelles et n'autorise pas la permission administrateur. Les collections sont limitées à 100 éléments.
+Le moteur utilise une liste d'instructions autorisées et n'est pas conçu pour exécuter du Python arbitraire. Les scripts ont des limites de taille, d'actions et de temps. Ne partage jamais ton token Discord. Consulte `docu.md` pour la syntaxe documentée et vérifie les fonctionnalités prises en charge par la version installée.
