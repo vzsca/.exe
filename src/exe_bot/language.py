@@ -945,7 +945,7 @@ def _validate_modern_surface_syntax(source: str) -> None:
                 raise ScriptError(f"Line {line_number}: unexpected closing parenthesis")
             paren_depth -= 1
             statement.append(char)
-        elif char == "\\n":
+        elif char == "\n":
             if literal_brace_depth:
                 statement.append(char)
             elif not "".join(statement).strip():
@@ -960,7 +960,7 @@ def _validate_modern_surface_syntax(source: str) -> None:
             line_number += 1
         elif char == "{" and paren_depth == 0:
             prefix = "".join(statement).strip()
-            if re.fullmatch(r"var\\s+[A-Za-z_]\\w*\\.input", prefix):
+            if re.fullmatch(r"var\s+[A-Za-z_]\w*\.input", prefix):
                 input_brace = True
                 statement.append(char)
             elif input_brace:
@@ -968,7 +968,7 @@ def _validate_modern_surface_syntax(source: str) -> None:
             elif literal_brace_depth:
                 literal_brace_depth += 1
                 statement.append(char)
-            elif re.match(r"^(?:if|elif|else|repeat|for)\\b", prefix):
+            elif re.match(r"^(?:if|elif|else|repeat|for)\b", prefix):
                 statement = []
                 block_depth += 1
                 statement_line = line_number
