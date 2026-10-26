@@ -139,3 +139,23 @@ def test_unclosed_quote_is_rejected():
 def test_action_budget_counts_both_if_branches():
     with pytest.raises(ScriptError, match="limit of 1"):
         parse_script('var enabled.bool = True; if (enabled == True) { @send("a"); } else { @send("b"); }', max_actions=1)
+
+
+def test_boolean_operators_short_circuit():
+    # The right-hand side must not be evaluated when the result is already known.
+    program = parse_script(
+        'var enabled.bool = False; '
+        'var result.bool = enabled and (1 / 0); '
+        '@send("safe");'
+    )
+    assert program[1].value is False
+    assert expand_actions(program) == [SendMessage("safe")]
+
+
+def test_or_operator_short_circuits():
+    program = parse_script(
+        'var enabled.bool = True; '
+        'var result.bool = enabled or (1 / 0); '
+        '@send("safe");'
+    )
+    assert program[1].value is True
