@@ -3,6 +3,7 @@ import pytest
 from exe_bot.language import (
     DiscordAction,
     InputVariable,
+    IfEquals,
     ScriptError,
     SendMessage,
     expand_actions,
@@ -191,3 +192,40 @@ def test_dictionary_literal_does_not_break_following_block():
         'var mode.str = config["mode"]; if (mode == "safe") { @send("ok"); }'
     )
     assert expand_actions(program) == [SendMessage("ok")]
+
+
+
+def test_condition_on_runtime_input_is_deferred_until_execution():
+    program = parse_script(
+        'var answer.input{str, "Type yes"} = ""; '
+        'if (answer == "yes") { @send("accepted"); } '
+        'else { @send("rejected"); }'
+    )
+    assert isinstance(program[1], IfEquals)
+    assert program[1].matched is None
+    actions = expand_actions(program)
+    assert isinstance(actions[1], IfEquals)
+    assert actions[1].variable_name == "answer"
+    assert actions[1].expected == "yes"
+    assert [action.text for action in expand_actions(list(actions[1].body))] == ["accepted"]
+    assert [action.text for action in expand_actions(list(actions[1].else_body))] == ["rejected"]
+
+
+def test_native_aliases_inside_message_strings_are_preserved():
+    source = '@send("write @send( and mute( literally");'
+    assert expand_actions(parse_script(source)) == [
+        SendMessage("write @send( and mute( literally")
+    ]
+
+
+def test_expression_ast_depth_is_bounded():
+    expression = "not " * 40 + "True"
+    with pytest.raises(ScriptError, match="nested too deeply"):
+        parse_script(f"var flag.bool = {expression}; @send(\"safe\");")
+
+
+def test_expression_numeric_result_is_bounded():
+    large = "9" * 1000
+    expression = " * ".join([large] * 6)
+    with pytest.raises(ScriptError, match="numeric result is too large"):
+        parse_script(f"var value.int = {expression}; @send(\"safe\");")
