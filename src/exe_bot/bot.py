@@ -358,7 +358,7 @@ def build_bot(settings: Settings) -> ExeBot:
             await guild.create_text_channel(
                 channel_name,
                 category=category,
-                overwrites=overwrites or None,
+                overwrites=overwrites,
                 reason=f".exe by {actor.id}",
             )
         elif name == "delete_channel":
