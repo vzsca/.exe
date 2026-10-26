@@ -27,7 +27,7 @@ Déclaration : `var name.type = value;`
 
 Types acceptés par le parseur : `str`, `int`, `float`, `bool`, `list`, `dict`, `time`, `user.id`, `channel.id`, `category.id`, `role.id`, `message.id`.
 
-Les déclarations typées vérifient actuellement que le nom de type est reconnu, mais **la vérification stricte de compatibilité entre type déclaré et valeur n'est pas complète**. Les suffixes `.id` servent à documenter l'intention et ne garantissent pas à eux seuls l'existence de l'objet Discord.
+Les déclarations typées vérifient la compatibilité des valeurs initiales et des affectations avec le type déclaré. `float` accepte aussi les entiers ; `user.id`, `channel.id`, `category.id`, `role.id` et `message.id` acceptent une chaîne, un entier ou `None` pour représenter une référence non renseignée. Les suffixes `.id` ne garantissent pas à eux seuls l'existence de l'objet Discord.
 
 Pour mettre à jour une variable existante : `set name = expression;`
 
