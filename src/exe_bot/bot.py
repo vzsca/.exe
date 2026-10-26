@@ -16,20 +16,21 @@ from .storage import Database, StorageError
 
 log = logging.getLogger(__name__)
 
-HELP_TEXT = (
-    'Modern .exe syntax: var greeting.str = "Hello"; @send(greeting);\\n'
-    'Every instruction ends with a semicolon. Newlines are optional after semicolons.\\n'
-    'Blocks use braces: if (mode == "safe") { @send("allowed"); }\\n'
-    'Repeat: repeat(3) { @send("again"); } or for i in range(0, 5) { @send(f"{i}"); }\\n'
-    'Variables: var count.int = 3; set count = 4;\\n'
-    'Input: var username.input{str, "What is your username?"} = "";\\n'
-    'Moderation: @ban(user_id, "reason"); @kick(user_id, "reason"); @unban(user_id); @mute(user_id, 10); @unmute(user_id);\\n'
-    'Roles: @create_role("name"); @add_role(user_id, role); @remove_role(user_id, role); @delete_role(id_or_exact_name);\\n'
-    'Channels: @create_channel("name"); @delete_channel(id_or_exact_name); @slowmode(seconds); @clear(count);\\n'
-    'Messages: @send("message"); @send("message", "#channel"); \\n'
-    'Compact syntax and native calls without @ are not supported. Only whitelisted users may run scripts; Discord permissions and role hierarchy still apply.\\n'
+HELP_TEXT = "\\n".join([
+    'Modern .exe syntax: var greeting.str = "Hello"; @send(greeting);',
+    'Every instruction ends with a semicolon. Newlines are optional after semicolons.',
+    'Blocks use braces: if (mode == "safe") { @send("allowed"); }',
+    'Repeat: repeat(3) { @send("again"); } or for i in range(0, 5) { @send(f"{i}"); }',
+    'Variables: var count.int = 3; set count = 4;',
+    'Dictionaries: var config.dict = {"mode": "safe"}; var mode.str = config["mode"];',
+    'Input: var username.input{str, "What is your username?"} = "";',
+    'Moderation: @ban(user_id, "reason"); @kick(user_id, "reason"); @unban(user_id); @mute(user_id, 10); @unmute(user_id);',
+    'Roles: @create_role("name"); @add_role(user_id, role); @remove_role(user_id, role); @delete_role(id_or_exact_name);',
+    'Channels: @create_channel("name"); @delete_channel(id_or_exact_name); @slowmode(seconds); @clear(count);',
+    'Messages: @send("message"); @send("message", "#channel");',
+    'Compact syntax and native calls without @ are not supported. Only whitelisted users may run scripts; Discord permissions and role hierarchy still apply.',
     'Owner whitelist: !exe admin add @user, !exe admin remove @user, !exe admin list.'
-)
+])
 _USER_ID = re.compile(r"^(?:<@!?(\d+)>|(\d+))$")
 _CREATE_RE = re.compile(r"^create\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s*::\s*(.+)$", re.IGNORECASE | re.DOTALL)
 _NAME_COMMAND_RE = re.compile(r"^(run|delete)\s+([A-Za-z][A-Za-z0-9_-]{0,31})$", re.IGNORECASE)
