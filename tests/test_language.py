@@ -334,6 +334,30 @@ def test_created_channel_and_category_results_are_typed_and_reusable(
     assert actions[-1] == expected_message
 
 
+@pytest.mark.parametrize(
+    "source, expected_action, expected_message",
+    [
+        (
+            '@send(f"created {@create_channel("annonces")}");',
+            "create_channel",
+            SendMessage("created #__EXE_VAR___exe_result_0__", channel_mentions=True),
+        ),
+        (
+            '@send(f"created {@create_category("Infos")}");',
+            "create_category",
+            SendMessage("created __EXE_VAR___exe_result_0__"),
+        ),
+    ],
+)
+def test_inline_channel_and_category_creation_can_be_reused_in_fstrings(
+    source, expected_action, expected_message
+):
+    actions = expand_actions(parse_script(source))
+    assert actions[0].name == expected_action
+    assert actions[0].result_variable == "__exe_result_0"
+    assert actions[1] == expected_message
+
+
 def test_create_channel_result_requires_channel_id_type():
     with pytest.raises(ScriptError, match="channel.id"):
         parse_script(
