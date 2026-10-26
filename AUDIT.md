@@ -54,7 +54,7 @@ No claim of complete security or GDPR compliance is made by this audit. Operator
 
 ## Follow-up fixes
 
-The current audit branch addresses the previously identified source-level defects:
+The remediation merged through pull requests #2 and #3 addresses the identified source-level defects:
 
 - Conditions depending on user input are deferred to runtime rather than compared against a parser placeholder.
 - Native-call and alias normalization no longer rewrites text inside quoted strings.
@@ -66,7 +66,7 @@ The current audit branch addresses the previously identified source-level defect
 
 ## Validation status
 
-The fixes are committed to the audit branch. They still require the repository's CI workflow to run; do not treat this source-level update as proof that all tests pass until GitHub Actions reports success.
+GitHub Actions completed successfully for the test and compile workflow on both remediation pull requests. The suite includes regression tests for runtime-dependent conditions, quoted-string normalization, expression resource limits, optional Server Members Intent configuration, and multi-action `if`, `else`, and `repeat` blocks. Live Discord permissions and API behavior still need testing in a private server.
 
 ## Files reviewed or updated
 
