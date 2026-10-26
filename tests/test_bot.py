@@ -25,7 +25,6 @@ def test_unwhitelisted_user_is_denied_before_script_execution(tmp_path):
             ctx.reply.assert_awaited_once()
             assert "Access denied" in ctx.reply.await_args.args[0]
         finally:
-            bot.db.close()
             await bot.close()
 
     asyncio.run(scenario())
