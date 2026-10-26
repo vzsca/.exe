@@ -49,9 +49,11 @@ class Repeat:
 
 @dataclass(frozen=True, slots=True)
 class IfEquals:
-    matched: bool
+    matched: bool | None
     body: tuple["Instruction", ...]
     else_body: tuple["Instruction", ...] = ()
+    variable_name: str | None = None
+    expected: object = None
 
 
 Instruction = SetVariable | InputVariable | SendMessage | DiscordAction | Repeat | IfEquals
@@ -183,8 +185,24 @@ def _eval_expression(node: ast.AST, variables: dict[str, object]) -> object:
 def _safe_expression(source: str, variables: dict[str, object]) -> object:
     try:
         parsed = ast.parse(source, mode="eval")
-        return _eval_expression(parsed.body, variables)
-    except (SyntaxError, ValueError, TypeError, ZeroDivisionError, OverflowError, KeyError, IndexError) as exc:
+        # Bound both parser work and recursive evaluation before walking the AST.
+        stack: list[tuple[ast.AST, int]] = [(parsed, 0)]
+        node_count = 0
+        while stack:
+            node, depth = stack.pop()
+            node_count += 1
+            if node_count > 256:
+                raise ValueError("expression is too complex (maximum 256 AST nodes)")
+            if depth > 32:
+                raise ValueError("expression is nested too deeply (maximum depth 32)")
+            stack.extend((child, depth + 1) for child in ast.iter_child_nodes(node))
+        result = _eval_expression(parsed.body, variables)
+        if isinstance(result, int) and not isinstance(result, bool) and result.bit_length() > 4096:
+            raise ValueError("numeric result is too large")
+        if isinstance(result, float) and not __import__("math").isfinite(result):
+            raise ValueError("numeric result must be finite")
+        return result
+    except (SyntaxError, ValueError, TypeError, ZeroDivisionError, OverflowError, KeyError, IndexError, RecursionError) as exc:
         raise ValueError(str(exc) or "invalid expression") from exc
 
 
@@ -416,10 +434,14 @@ def _parse_one(
         if variable_name not in variables:
             raise ScriptError(f"Line {line_number}: unknown variable '{variable_name}'")
         expected = _parse_value(raw_expected, line_number, variables)
+        current_value = variables[variable_name]
+        dynamic = current_value == "__EXE_PENDING_INPUT__" or (
+            isinstance(current_value, str) and current_value.startswith("__EXE_VAR_")
+        )
         body = _parse_body(body_source.strip(), line_number, variables, depth + 1)
         if not body:
             raise ScriptError(f"Line {line_number}: if body cannot be empty")
-        return [IfEquals(variables[variable_name] == expected, tuple(body))]
+        return [IfEquals(None if dynamic else current_value == expected, tuple(body), (), variable_name, expected)]
 
     for_match = re.fullmatch(rf"for\s+({_NAME})\s+in\s+range\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*:\s*(.+)", statement)
     if for_match:
@@ -738,6 +760,38 @@ _NATIVE_ALIASES = {
 }
 
 
+def _replace_outside_strings(source: str, pattern: str, replacement: str) -> str:
+    """Apply a regex only to source text outside single- and double-quoted strings."""
+    output: list[str] = []
+    segment: list[str] = []
+    quote: str | None = None
+    escaped = False
+
+    def flush() -> None:
+        if segment:
+            output.append(re.sub(pattern, replacement, "".join(segment)))
+            segment.clear()
+
+    for char in source:
+        if quote is None:
+            if char in ("'", '"'):
+                flush()
+                quote = char
+                output.append(char)
+            else:
+                segment.append(char)
+        else:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+    flush()
+    return "".join(output)
+
+
 def _normalize_modern_syntax(source: str) -> str:
     """Translate the agreed English, brace-based surface syntax to the legacy AST parser.
 
@@ -865,9 +919,13 @@ def _normalize_modern_syntax(source: str) -> str:
                     stripped = f"let {assign.group(1)} = {assign.group(2)}"
 
         # Native calls require @ in the new syntax; the runtime registry remains allowlisted.
-        stripped = re.sub(r"(?<![\w@])@([A-Za-z_][A-Za-z0-9_]*)\s*\(", r"\1(", stripped)
+        stripped = _replace_outside_strings(
+            stripped, r"(?<![\w@])@([A-Za-z_][A-Za-z0-9_]*)\s*\(", r"\1("
+        )
         for old_name, new_name in _NATIVE_ALIASES.items():
-            stripped = re.sub(rf"\b{re.escape(old_name)}\s*\(", f"{new_name}(", stripped)
+            stripped = _replace_outside_strings(
+                stripped, rf"\b{re.escape(old_name)}\s*\(", f"{new_name}("
+            )
         # The legacy engine uses timeout(minutes) for mute(duration).
         normalized.append(" " * (len(line) - len(line.lstrip())) + stripped)
     return "\n".join(normalized)
@@ -1059,7 +1117,10 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
             if previous.else_body:
                 raise ScriptError(f"Line {line_number}: an if condition can only have one else")
             else_body = _parse_one(else_match.group(1).strip(), line_number, variables, 1)
-            instructions[-1] = IfEquals(previous.matched, previous.body, tuple(else_body))
+            instructions[-1] = IfEquals(
+                previous.matched, previous.body, tuple(else_body),
+                previous.variable_name, previous.expected,
+            )
             continue
 
         parsed = _parse_one(statement, line_number, variables, 0)
@@ -1095,9 +1156,9 @@ def _count_actions(instruction: Instruction) -> int:
     return instruction.count * sum(_count_actions(item) for item in instruction.body)
 
 
-def expand_actions(instructions: list[Instruction]) -> list[SendMessage | DiscordAction]:
-    """Expand bounded repeats into the shared list of executable Discord actions."""
-    actions: list[SendMessage | DiscordAction] = []
+def expand_actions(instructions: list[Instruction]) -> list[Instruction]:
+    """Expand bounded repeats and retain conditions that depend on runtime values."""
+    actions: list[Instruction] = []
 
     def expand(items: tuple[Instruction, ...] | list[Instruction]) -> None:
         for item in items:
@@ -1107,8 +1168,11 @@ def expand_actions(instructions: list[Instruction]) -> list[SendMessage | Discor
                 for _ in range(item.count):
                     expand(item.body)
             elif isinstance(item, IfEquals):
-                expand(item.body if item.matched else item.else_body)
-            # Variables and conditions are resolved by the parser before execution.
+                if item.matched is None:
+                    actions.append(item)
+                else:
+                    expand(item.body if item.matched else item.else_body)
+            # SetVariable values are validated and resolved by the parser.
 
     expand(instructions)
     return actions
