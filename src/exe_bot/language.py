@@ -1362,17 +1362,24 @@ def parse_script(source: str, *, max_actions: int = 20) -> list[Instruction]:
         channel_id_names = {
             name for name, type_name in declared_types.items() if type_name == "channel.id"
         }
-        parsed = [
-            SendMessage(
-                instruction.text,
+        def mark_channel_mentions(instruction: SendMessage) -> SendMessage:
+            text_value = instruction.text
+            for name in channel_id_names:
+                token = f"__EXE_VAR_{name}__"
+                text_value = re.sub(r"(?<!#)" + re.escape(token), "#" + token, text_value)
+            return SendMessage(
+                text_value,
                 instruction.channel,
                 instruction.role_mentions or any(
-                    f"__EXE_VAR_{name}__" in instruction.text for name in role_id_names
+                    f"__EXE_VAR_{name}__" in text_value for name in role_id_names
                 ),
                 instruction.channel_mentions or any(
-                    f"__EXE_VAR_{name}__" in instruction.text for name in channel_id_names
+                    f"#__EXE_VAR_{name}__" in text_value for name in channel_id_names
                 ),
             )
+
+        parsed = [
+            mark_channel_mentions(instruction)
             if isinstance(instruction, SendMessage)
             else instruction
             for instruction in parsed
