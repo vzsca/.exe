@@ -90,7 +90,7 @@ Native calls must start with @.
 | @untimeout(user) | 1 | Remove a timeout. |
 | @give_role(user, role) / @add_role(user, role) | 2 | Assign a role. |
 | @remove_role(user, role) | 2 | Remove a role. |
-| @create_role(name[, color[, permissions]]) | 1–3 | Create a role. Color is a six-digit hex value; permissions are a comma-separated allowlist. The administrator permission and other unsupported permissions are rejected. |
+| @create_role(name[, color[, permissions]]) | 1–3 | Create a role. Color is a six-digit hex value; permissions are a comma-separated allowlist. The administrator permission and other unsupported permissions are rejected. A create_role call can be embedded in a send f-string with nested quoted arguments. |
 | @delete_role(role_id_or_name) | 1 | Delete a role by ID or exact name. |
 | @create_category(name[, permissions]) | 1–2 | Create a category, optionally with role permission overwrites. |
 | @create_channel(name[, category[, permissions]]) | 1–3 | Create a text channel, optionally in an existing category and with permission overwrites. |
@@ -103,6 +103,8 @@ Native calls must start with @.
 | @guilds_categories() | 0 | List server categories. |
 
 For @create_role, permission names are explicitly allowlisted in the runtime. They include selected channel, voice, moderation, and audit-log permissions, but not administrator. Category/channel overwrites use entries such as "@everyone:view_channel=deny, Moderators:send_messages=allow". Targets can be @everyone, a role ID, or an exact role name.
+
+The declaration grammar is `var variable_name.type`. For a role reference, use `var new_role.role.id = None;` (the variable name is `new_role`, and its type is `role.id`). Writing `var role.id` instead declares a variable named `role` with the unsupported type `id`.
 
 To reuse a role created by a script, declare a role.id variable and assign it the native action result:
 
