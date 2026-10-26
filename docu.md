@@ -121,8 +121,8 @@ Le nombre d'arguments et les fonctions sont vérifiés par le parseur. Les actio
 ## Limites et sécurité
 
 - Taille maximale du script : 8 000 caractères.
-- Budget d'actions configurable par `MAX_SCRIPT_ACTIONS` (20 par défaut).
-- Durée maximale configurable par `SCRIPT_TIMEOUT_SECONDS` (60 secondes par défaut).
+- Budget d'actions configurable par `MAX_SCRIPT_ACTIONS` (1 000 par défaut, maximum 1 000).
+- Durée maximale configurable par `SCRIPT_TIMEOUT_SECONDS` (300 secondes / 5 minutes par défaut, maximum 300).
 - Les actions de modération sont soumises à des vérifications de permissions côté bot.
 - Les expressions sont évaluées à partir d'une liste autorisée de nœuds AST ; aucun `eval` ou `exec` n'est utilisé.
 - Les fonctions et propriétés non listées ici doivent être considérées comme non prises en charge.
