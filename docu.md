@@ -19,7 +19,7 @@ La syntaxe du langage utilise des noms anglais : `member`, `channel`, `category`
 Les blocs utilisent `{}`. Les retours à la ligne et l'indentation sont facultatifs. Le point-virgule `;` sépare les instructions.
 
 ```text
-var nom.str = "Tests"; var nombre.int = 3; @send(f"{nom} : {nombre}");
+var name.str = "Tests"; var count.int = 3; @send(f"{name}: {count}");
 ```
 
 Les fonctions natives commencent par `@`. Aucun commentaire n'est accepté. `#` est l'opérateur logique NOT ; dans une chaîne, il peut servir de caractère normal, par exemple `"#FF0000"`.
@@ -54,7 +54,7 @@ var target.user.id = None
 var channels.list = ()
 var configuration.dict = []
 var wait.time = 10
-set essais = 4
+set attempts = 4
 ```
 
 `None` signifie qu’aucune valeur n’est définie. Il peut initialiser une variable typée en attente d’une valeur, notamment un identifiant Discord. `""` reste une chaîne vide de type `str`. Une liste vide s'écrit `()`, un dictionnaire vide `[]`. `set nom = valeur` modifie une variable existante, sans répéter son type ; une valeur incompatible produit une erreur de type.
@@ -88,7 +88,7 @@ repeat(3) {
     @send("Repeat");
 }
 
-for member in guild.user {
+for member in guild.member {
     @send(member.name);
 }
 
@@ -97,7 +97,7 @@ for i in range(0, 5) {
 }
 ```
 
-`repeat(n)` répète le bloc n fois. `for variable in collection` parcourt une collection. `range(debut, fin)` inclut le début et exclut la fin : `range(0, 5)` produit 0 à 4. Discord collections should be iterated over a stable snapshot if the script modifies them.
+`repeat(n)` repeats the block n times. `for variable in collection` iterates over a collection. `range(start, stop)` includes the start and excludes the stop: `range(0, 5)` produces 0 to 4. Discord collections should be iterated over a stable snapshot if the script modifies them.
 
 ## Chaînes formatées
 
@@ -216,7 +216,7 @@ Tous les appels de fonctions commencent par `@`. Seules les fonctions répertori
 | `@ban(user, reason?)` | Utilisateur, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
 | `@kick(user, reason?)` | Utilisateur, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
 | `@unban(user_id)` | Identifiant user uniquement | `True` en cas de succès ; sinon `False` avec une erreur explicative |
-| `@mute(user, durée, reason?)` | Utilisateur, durée, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
+| `@mute(user, duration, reason?)` | Utilisateur, durée, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
 | `@unmute(user, reason?)` | Utilisateur, reason facultative | `True` en cas de succès ; sinon `False` avec une erreur explicative |
 
 ### Channels and categories
@@ -235,14 +235,14 @@ Tous les appels de fonctions commencent par `@`. Seules les fonctions répertori
 
 | Fonction | Rôle |
 |---|---|
-| `@create_role(nom, color?, perm?)` | Crée un rôle et doit renvoyer son identifiant `role.id` en cas de succès. |
+| `@create_role(name, color?, permissions?)` | Crée un rôle et doit renvoyer son identifiant `role.id` en cas de succès. |
 | `@delete_role(id, reason?)` | Supprime un rôle. |
 | `@set_role.name(role_id, name)` | Modifie le nom d'un rôle. |
 | `@set_role.color(role_id, "#RRGGBB")` | Modifie la color d'un rôle. |
 | `@set_role.permissions(role_id, permission:True;other_permission:False)` | Modifie une ou plusieurs permissions du rôle. |
 | `@add_role(user, role)` | Attribue un rôle à un user. |
 
-For `.permissions`, each permission receives `True` ou `False`. Plusieurs changements peuvent être séparés par des points-virgules. Les noms de permissions acceptés doivent correspondre aux permissions Discord prises en charge par le bot.
+For `.permissions`, each permission is set to `True` or `False`. Multiple changes are separated by semicolons. Permission names must match the Discord permissions supported by the bot.
 
 ### Messages
 
@@ -251,23 +251,23 @@ For `.permissions`, each permission receives `True` ou `False`. Plusieurs change
 | `@send(message)` | Envoie un message dans le channel où le script a été lancé. |
 | `@send(channel, message)` | Envoie un message dans le channel indiqué. |
 | `@dm(user, message)` | Envoie un message privé à l'user. |
-| `@clear(nombre)` | Supprime le nombre de messages indiqué, dans les limites imposées par Discord. |
+| `@clear(count)` | Supprime le nombre de messages indiqué, dans les limites imposées par Discord. |
 
-Les messages peuvent être des chaînes normales ou formatées : `@send(f"Welcome {member.name} !")`.
+Messages can be plain or formatted strings: `@send(f"Welcome {member.name} !")`.
 
 ## Durées
 
-Le type `time` représente une durée. Sans suffixe, la valeur est exprimée en minutes.
+The `time` type represents a duration. Without a suffix, the value is in minutes.
 
 | Suffixe | Unité |
 |---|---|
-| aucun | minutes |
+| none | minutes |
 | `s`, `sec` | seconds |
 | `m`, `min` | minutes |
-| `h` | heures |
-| `d` | jours |
+| `h` | hours |
+| `d` | days |
 
-Les suffixes ne sont pas sensibles à la casse.
+Suffixes are case-insensitive.
 
 ```text
 var short.time = 30sec
