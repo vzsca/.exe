@@ -1023,6 +1023,10 @@ def _normalize_modern_syntax(source: str) -> str:
         if decl:
             name, type_name, value = decl.groups()
             if type_name not in _TYPE_NAMES:
+                if type_name == "id":
+                    raise ScriptError(
+                        f"Unknown variable type 'id' for '{name}'. Use a qualified Discord type, e.g. 'var new_role.role.id = None;' for a role reference."
+                    )
                 raise ScriptError(f"Unknown variable type '{type_name}'")
             stripped = f"let {name} = {value}"
         else:
