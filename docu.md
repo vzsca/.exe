@@ -1,135 +1,346 @@
-# .exe Language Reference
+# DHS / .exe Language Reference
 
-This document describes the syntax and behavior implemented by the current parser and Discord runtime. It is a reference to the current implementation, not a promise of future features.
+This document describes only the DHS/.exe scripting language as implemented by the current parser and runtime. It does not document bot commands, the control panel, setup, repository operations, or legal documents. DHS is a restricted scripting language, **not general Python**. Arbitrary Python execution, imports, object attribute access, and arbitrary function calls are not supported.
 
-## Syntax rules
+## 1. Basic rules
 
 - Keywords, types, and native function names are English.
-- Every instruction must end with a semicolon (;).
-- Newlines are optional after a semicolon.
-- Blocks use braces ({ and }) and do not need a trailing semicolon.
-- Native Discord calls must be prefixed with @.
-- Legacy syntax such as let, unprefixed send(...), and compact v(), m(), R(), I(), or E() forms is rejected.
-- Scripts cannot execute arbitrary Python code.
+- Every instruction ends with a semicolon (`;`). Newlines do not replace semicolons.
+- Blocks use `{` and `}`; a closing brace needs no semicolon.
+- Native Discord functions must start with `@`.
+- Variable names start with a letter or underscore, followed by letters, digits, or underscores. Maximum length: 32 characters.
+- Single- and double-quoted strings are supported.
+- Empty scripts and scripts with no action are rejected.
+- Legacy `let` declarations, unprefixed `send(...)`, and compact forms `v(...)`, `m(...)`, `R(...)`, `I(...)`, and `E(...)` are rejected.
 
-Example:
+```text
+var greeting.str = "Hello";
+var count.int = 2;
+set count = count + 1;
+@send(f"{greeting}: {count}");
+```
 
-    var greeting.str = "Hello";
-    var count.int = 2;
-    set count = count + 1;
-    @send(f"{greeting}: {count}");
+## 2. Variables and types
 
-## Variables and expressions
+Declaration: `var NAME.TYPE = VALUE;`
 
-Declare a variable with var name.type = value; and update it with set name = expression;.
+Assignment: `set NAME = EXPRESSION;`
 
-Supported declared types:
+Declare a variable before assigning to it. Assignments are checked against the variable's declared type; `set` does not change that type.
 
-str, int, float, bool, list, dict, time, user.id, channel.id, category.id, role.id, and message.id.
+| Type | Meaning and accepted values |
+|---|---|
+| `str` | Text |
+| `int` | Integer; Boolean values do not count as integers for type checking |
+| `float` | Integer or floating-point number |
+| `bool` | `True` or `False` |
+| `list` | List or tuple |
+| `dict` | Dictionary |
+| `time` | Number or string; no special time arithmetic |
+| `user.id` | Discord user/member reference |
+| `channel.id` | Discord channel reference |
+| `category.id` | Discord category reference |
+| `role.id` | Discord role reference |
+| `message.id` | Discord message reference |
 
-Type checks apply to declarations and assignments. float also accepts integers; list accepts lists and tuples; dict accepts dictionaries; time accepts numbers and strings. The .id types accept strings, integers, or None for an unset reference. An .id type does not prove that the referenced Discord object exists.
+Discord `.id` types accept a string, integer, or `None`. This does not prove the referenced Discord object exists.
 
-Safe expressions support constants, variables, list/tuple/dictionary literals, indexing, arithmetic (+, -, *, /, //, %), Boolean operations (and, or, not), and comparisons (==, !=, <, <=, >, >=). Arbitrary function calls and Python attribute access are not allowed. Collections are limited to 100 items.
+Convenient shorthand declarations are supported when the variable name matches the Discord ID type: `var user.id = None;`, `var channel.id = None;`, `var category.id = None;`, `var role.id = None;`, and `var message.id = None;`. Full declarations such as `var helper_role.role.id = None;` are also supported.
 
-Dictionary example:
+Rules:
+- `float` accepts integers.
+- `bool` does not accept `0` or `1` as substitutes for Boolean values.
+- `list` accepts lists and tuples; `dict` accepts dictionaries.
+- `time` accepts numbers or strings, but not Boolean values.
+- `None` is accepted for Discord `.id` types.
 
-    var config.dict = {"mode": "safe", "retries": 3};
-    var mode.str = config["mode"];
-    var enabled.bool = config["nested"]["enabled"];
+```text
+var username.str = "Alex";
+var attempts.int = 3;
+var ratio.float = 1.5;
+var active.bool = True;
+var names.list = ["Alex", "Sam"];
+var config.dict = {"mode": "safe", "retries": 3};
+var helper_role.role.id = None;
+set attempts = attempts + 1;
+```
 
-Nested dictionaries and indexing are supported. Dictionary keys and values must still be valid safe expressions.
+## 3. Literals, collections, and indexing
 
-Boolean literals are True and False; the empty value is None. randint(min, max) returns a bounded random integer. Its minimum cannot exceed its maximum, and bounds must stay between -1,000,000,000 and 1,000,000,000.
+Supported literals include strings (`"hello"` or `'hello'`), numbers (`12`, `-4`, `2.75`), Booleans (`True`, `False`), `None`, lists (`[1, 2, 3]`), tuples (`(10, 20)`), dictionaries (`{"mode": "safe", "retries": 3}`), and nested dictionaries.
 
-## Conditions and loops
+Indexing works on strings, lists, tuples, and dictionaries:
 
-An if condition currently compares one declared variable with one expected value. An optional else block is supported:
+```text
+var names.list = ["Alex", "Sam"];
+var first.str = names[0];
+var config.dict = {"service": {"enabled": True}};
+var enabled.bool = config["service"]["enabled"];
+```
 
-    var mode.str = "safe";
-    if (mode == "safe") {
-        @send("allowed");
-    } else {
-        @send("blocked");
-    }
+Collections are limited to 100 items. Keys and indexes must be valid safe expressions; invalid keys or indexes raise an error.
 
-General compound expressions are not supported in block conditions. elif and loops over Discord collections are not supported.
+## 4. Operators and logic
 
-Repeat a block a fixed number of times:
+- Arithmetic: `+` (addition; also concatenates compatible strings/collections), `-` (subtraction), `*` (multiplication; may repeat strings/lists/tuples), `/` (division), `//` (floor division), `%` (remainder/modulo).
+- Unary: `+X`, `-X`, `not X`.
+- Boolean: `X and Y` and `X or Y`, with short-circuit evaluation; `not X`.
+- Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`.
+- Parentheses group expressions. Chained comparisons are supported by the expression evaluator.
 
-    repeat(3) {
-        @send("again");
-    }
+```text
+var total.int = 7 + 3;
+var remainder.int = 10 % 3;
+var equal.bool = total == 10;
+var allowed.bool = True and not False;
+var condition.bool = (total < 5) or (total >= 10);
+```
 
-Iterate over a numeric range (the stop value is exclusive):
+Expressions support constants, variables, collection literals, indexing, and the operators above. Arbitrary function calls, object.attribute access, imports, lambdas, comprehensions, and arbitrary Python code are not supported.
 
-    for i in range(0, 3) {
-        @send(f"item {i}");
-    }
+## 5. Random integers
 
-Repeat counts and ranges are limited to 10 iterations. Range bounds must be between -1,000,000 and 1,000,000, and the stop value must be greater than the start value. Nested blocks are limited to four levels. The action budget is checked before execution.
+`randint(MIN, MAX)` returns a random integer including both endpoints:
 
-## User input
+```text
+var roll.int = randint(1, 6);
+```
 
-    var username.input{str, "What is your username?"} = "";
-    @send(f"Hello {username}!");
+`MIN` must not exceed `MAX`; both bounds must be between -1,000,000,000 and 1,000,000,000. This is a specially supported expression, not permission to call arbitrary functions.
 
-Input declarations accept str, int, float, bool, and the .id types. list, dict, and time are not accepted for input. The initial value is currently ignored: the reply is stored as plain text regardless of the declared type. Input waits for a message from the script author in the same channel and uses the configured script timeout. Replies over 1,800 characters are rejected, and @ is neutralized to prevent user-supplied mentions from pinging.
+## 6. Formatted strings (f-strings)
 
-## Native Discord actions
+Insert variables or supported expressions into text using braces:
 
-Native calls must start with @.
+```text
+var username.str = "Alex";
+var score.int = 42;
+@send(f"Player {username} has {score} points.");
+```
 
-| Function | Arguments | Behavior |
-|---|---:|---|
-| @send(message) | 1 | Send a message in the current channel. |
-| @send(message, channel) | 2 | Send to a text channel identified by ID or exact name; a leading # is optional for names. |
-| @ban(user, reason) | 2 | Ban a user; the reason is required by the parser. |
-| @unban(user_id[, reason]) | 1–2 | Remove a ban. |
-| @kick(user[, reason]) | 1–2 | Kick a member. |
-| @timeout(user, minutes) | 2 | Timeout a member for 1–40,320 minutes. |
-| @untimeout(user) | 1 | Remove a timeout. |
-| @give_role(user, role) / @add_role(user, role) | 2 | Assign a role. |
-| @remove_role(user, role) | 2 | Remove a role. |
-| @create_role(name[, color[, permissions]]) | 1–3 | Create a role. Color is a six-digit hex value; permissions are a comma-separated allowlist. The administrator permission and other unsupported permissions are rejected. Assign the result to a `role.id` variable to reuse it. Creation calls can also be embedded directly in a send f-string with nested quoted arguments. |
-| @delete_role(role_id_or_name) | 1 | Delete a role by ID or exact name. |
-| @create_category(name[, permissions]) | 1–2 | Create a category, optionally with role permission overwrites. Assign the result to a `category.id` variable to reuse its ID. A direct create call in a send f-string can include its new ID in the message. |
-| @create_channel(name[, category[, permissions]]) | 1–3 | Create a text channel, optionally in an existing category and with permission overwrites. Assign the result to a `channel.id` variable; using it in an f-string produces a channel mention. A direct create call inside a send f-string also produces a mention of the new channel. |
-| @delete_channel(channel_id_or_name) | 1 | Delete a text channel by ID or exact name. Categories are not accepted. |
-| @slowmode(seconds) | 1 | Set slowmode in the current text channel (0–21,600 seconds). |
-| @clear(count) | 1 | Delete 1–100 messages in the current text channel. |
-| @guilds_roles() | 0 | List server roles. |
-| @guilds_members() | 0 | List up to 100 server members. Requires Server Members Intent and appropriate Discord access. |
-| @guilds_channels() | 0 | List server channels, excluding categories. |
-| @guilds_categories() | 0 | List server categories. |
+Indexing inside an f-string is supported:
 
-For @create_role, permission names are explicitly allowlisted in the runtime. They include selected channel, voice, moderation, and audit-log permissions, but not administrator. Category/channel overwrites use entries such as "@everyone:view_channel=deny, Moderators:send_messages=allow". Targets can be @everyone, a role ID, or an exact role name.
+```text
+var names.list = ["Alex", "Sam"];
+@send(f"First player: {names[0]}");
+```
 
-The declaration grammar is `var variable_name.type`. A full role-reference declaration is `var new_role.role.id = None;`. For convenience, `var role.id = None;` is also accepted as shorthand for a variable named `role` of type `role.id`.
+Only `create_role`, `create_category`, and `create_channel` have special support as embedded native calls in f-strings:
 
-To reuse a role created by a script, declare a role.id variable and assign it the native action result:
+```text
+@send(f"Role: {@create_role("Helpers", "#5865F2")}");
+@send(f"Category: {@create_category("Support")}");
+@send(f"Channel: {@create_channel("general")}");
+```
 
-    var helper_role.role.id = None;
-    set helper_role = @create_role("Helpers", "#5865F2");
-    @add_role("123456789012345678", helper_role);
+This is not general nested function-call support. Embedded call arguments must be quoted strings, integers, or supported role permission flags. Escape inner quotes as needed. Created role/channel/category references can be stored in correctly typed variables. Role and channel IDs inserted into f-strings are formatted as Discord mentions. User-provided input is neutralized to prevent unexpected mentions.
 
-Or create a role and include its mention directly in a message f-string:
+## 7. Conditions
 
-    var test.int = 10;
-    repeat(3) {
-        @send(f"{test}{@create_role(\"Helpers\", \"#5865F2\")}");
-    }
+Syntax:
 
-A created role can also be referenced in a later f-string with `@send(f"{helper_role}");`. User input is still neutralized to prevent unexpected mentions. The `administrator` permission remains forbidden even if the embedded call uses `administrator:True`.
+```text
+if (mode == "safe") {
+    @send("Allowed");
+} else {
+    @send("Blocked");
+}
+```
 
-The result is stored as an internal role reference and resolved during execution. The variable must be declared first and have type role.id. This assignment form is currently supported for @create_role only.
+The current `if` header compares one declared variable with one expected value using `==`. General compound conditions in the header are not supported. `elif` is not supported. `else` is optional, must immediately follow the `if` block, and can appear only once. Empty blocks are rejected. Although the expression evaluator supports more comparison and Boolean operators, the `if`-header grammar is narrower.
 
-Aliases @mute and @unmute normalize to @timeout and @untimeout. The runtime does not implement @dm, @lock, @unlock, @set_channel.*, @set_role.*, @time, @uptime, or @random(collection). Use randint(min, max) for a random integer.
+## 8. Loops
 
-## Runtime limits and safety
+Repeat a fixed count:
+
+```text
+repeat(3) {
+    @send("Again");
+}
+```
+
+Repeat with a counter (starts at 1):
+
+```text
+repeat 3 as i {
+    @send(f"Iteration {i}");
+}
+```
+
+Numeric range (start inclusive, stop exclusive):
+
+```text
+for i in range(0, 3) {
+    @send(f"Item {i}");
+}
+```
+
+Repeat count must be 1 through 10. A range can contain at most 10 iterations; its bounds must be between -1,000,000 and 1,000,000, and `stop` must be greater than `start`. Looping over Discord collections is not supported. Empty loop bodies are rejected. Nested blocks are limited to four levels.
+
+## 9. User input
+
+```text
+var username.input{str, "What is your username?"} = "";
+@send(f"Hello {username}!");
+```
+
+General form: `var NAME.input{TYPE, "QUESTION"} = INITIAL_VALUE;`
+
+Allowed input types: `str`, `int`, `float`, `bool`, `user.id`, `channel.id`, `category.id`, `role.id`, and `message.id`. `list`, `dict`, and `time` are not accepted.
+
+Runtime behavior:
+- `INITIAL_VALUE` is currently ignored.
+- The reply is stored as plain text regardless of declared type; declaring `int`, `float`, or `bool` does not convert it.
+- Input waits for a message from the script author in the same channel.
+- The configured script timeout applies.
+- Replies over 1,800 characters are rejected.
+- `@` is neutralized in replies to prevent user-supplied mentions from pinging.
+
+## 10. Native Discord functions
+
+All native calls start with `@`. Arguments are comma-separated and text arguments should normally be quoted. Argument counts and types are validated; Discord permissions, role hierarchy, and object existence still apply at runtime.
+
+### Messages
+
+| Function | Behavior |
+|---|---|
+| `@send(MESSAGE)` | Send to the current channel. |
+| `@send(MESSAGE, CHANNEL)` | Send to a text channel by ID or exact name. A leading `#` is optional for channel names. |
+
+Examples: `@send("Hello server");` and `@send("Hello general", "#general");`.
+
+### Moderation
+
+| Function | Behavior |
+|---|---|
+| `@ban(USER, REASON)` | Ban a user; reason is required. |
+| `@unban(USER_ID)` or `@unban(USER_ID, REASON)` | Remove a ban. |
+| `@kick(USER)` or `@kick(USER, REASON)` | Kick a member. |
+| `@timeout(USER, MINUTES)` | Timeout a member for 1 to 40,320 minutes. |
+| `@untimeout(USER)` | Remove a timeout. |
+| `@mute(USER, MINUTES)` | Alias for `@timeout`. |
+| `@unmute(USER)` | Alias for `@untimeout`. |
+
+For moderation targets, use a Discord ID or supported member mention; do not assume display names work.
+
+### Roles
+
+| Function | Behavior |
+|---|---|
+| `@give_role(USER, ROLE)` | Assign a role. |
+| `@add_role(USER, ROLE)` | Alias for `@give_role`. |
+| `@remove_role(USER, ROLE)` | Remove a role. |
+| `@create_role(NAME)` | Create a role. |
+| `@create_role(NAME, COLOR)` | Create a role with a color. |
+| `@create_role(NAME, COLOR, PERMISSIONS)` | Create a role with color and optional comma-separated permission allowlist. |
+| `@delete_role(ROLE_ID_OR_EXACT_NAME)` | Delete a role by ID or exact name. |
+
+Color must be a six-digit hexadecimal color, e.g. `"#5865F2"`. Administrator and unsupported permissions are rejected. The result of `@create_role` must be assigned to a variable declared as `role.id` to reuse it:
+
+```text
+var helper_role.role.id = None;
+set helper_role = @create_role("Helpers", "#5865F2");
+@give_role("123456789012345678", helper_role);
+```
+
+The administrator permission remains forbidden even in embedded calls.
+
+### Channels and categories
+
+| Function | Behavior |
+|---|---|
+| `@create_category(NAME)` | Create a category. |
+| `@create_category(NAME, PERMISSIONS)` | Create a category with permission overwrites. |
+| `@create_channel(NAME)` | Create a text channel. |
+| `@create_channel(NAME, CATEGORY)` | Create a text channel in an existing category. |
+| `@create_channel(NAME, CATEGORY, PERMISSIONS)` | Create a text channel in a category with permission overwrites. |
+| `@delete_channel(CHANNEL_ID_OR_EXACT_NAME)` | Delete a text channel by ID or exact name; categories are not accepted. |
+| `@slowmode(SECONDS)` | Set slowmode in the current text channel, from 0 to 21,600 seconds. |
+| `@clear(COUNT)` | Delete 1 to 100 messages in the current text channel. |
+
+Example of created object references:
+
+```text
+var support.category.id = None;
+set support = @create_category("Support");
+var help_channel.channel.id = None;
+set help_channel = @create_channel("help", support);
+```
+
+### Permission overwrites
+
+General format:
+
+```text
+"@everyone:view_channel=deny, Moderators:send_messages=allow"
+```
+
+Targets may be `@everyone`, a role ID, or an exact role name. Permission names must be supported by the runtime; not every Discord permission is accepted.
+
+### Server lists
+
+| Function | Behavior |
+|---|---|
+| `@guilds_roles()` | List server roles. Takes no arguments. |
+| `@guilds_members()` | List up to 100 members; requires Server Members Intent and Discord access. Takes no arguments. |
+| `@guilds_channels()` | List server channels, excluding categories. Takes no arguments. |
+| `@guilds_categories()` | List server categories. Takes no arguments. |
+
+## 11. Native permissions and restrictions
+
+The caller and bot both need the relevant Discord permission:
+
+- Ban/unban: **Ban Members**
+- Kick: **Kick Members**
+- Timeout/untimeout: **Moderate Members**
+- Give/add/remove/create/delete role: **Manage Roles**
+- Create/delete channel/category and slowmode: **Manage Channels**
+- Clear messages: **Manage Messages**
+
+The bot's top role must be above roles it assigns or removes. The caller's top role must be above the target role unless they own the server. `@everyone` cannot be assigned or removed this way. Moderation respects Discord role hierarchy. Administrative functions only work inside a server, not in DMs.
+
+## 12. Unsupported syntax and functions
+
+Not implemented as native functions: `@dm`, `@lock`, `@unlock`, `@set_channel`, `@set_role`, `@time`, `@uptime`, and `@random(collection)`. Use `randint(MIN, MAX)` for random integers.
+
+Also unsupported: `let` declarations, native calls without `@`, compact legacy syntax `v(...)`, `m(...)`, `R(...)`, `I(...)`, `E(...)`, `elif`, loops over Discord collections, general nested native calls, arbitrary Python execution, imports, and object attribute access.
+
+## 13. Limits
 
 - Maximum script length: 8,000 characters.
-- Runtime action budget: MAX_SCRIPT_ACTIONS, default 1,000 and maximum 1,000.
-- Script and input timeout: SCRIPT_TIMEOUT_SECONDS, default 300 seconds and maximum 300 seconds.
-- Each Discord action is subject to the caller's and bot's effective permissions and Discord role hierarchy.
-- Expressions are evaluated using an explicit AST allowlist; arbitrary eval and exec are not used.
-- Native actions can still make destructive changes. Review scripts before execution and grant the bot only the permissions it needs.
+- Runtime action budget: default 1,000 and maximum 1,000 actions.
+- Script/input timeout: default 300 seconds and maximum 300 seconds.
+- Collection size: maximum 100 items.
+- Ordinary text/expression result length: maximum 1,800 characters.
+- Expression AST: maximum 256 nodes and nesting depth 32.
+- Repeat/range iterations: maximum 10.
+- Nested blocks: maximum four levels.
+- The action budget counts actions in both conditional branches during validation.
+
+## 14. Complete example
+
+```text
+var username.input{str, "What is your name?"} = "";
+var greeting.str = "Welcome";
+@send(f"{greeting}, {username}!");
+
+var count.int = 3;
+repeat(count) {
+    @send(f"Message {count}");
+}
+
+var status.str = "safe";
+if (status == "safe") {
+    @send("The status is safe.");
+} else {
+    @send("The status is not safe.");
+}
+
+var created_role.role.id = None;
+set created_role = @create_role("Helpers", "#5865F2");
+@send(f"Created role: {created_role}");
+```
+
+## Runtime safety notes
+
+Expressions are evaluated through an explicit AST allowlist. Native Discord actions can still make real changes and are subject to Discord permissions and role hierarchy. Review scripts before execution and grant the bot only the permissions it needs.
