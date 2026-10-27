@@ -125,7 +125,7 @@ var names.list = ["Alex", "Sam"];
 @send(f"First player: {names[0]}");
 ```
 
-Only `create_role`, `create_category`, and `create_channel` have special support as embedded native calls in f-strings:
+`create_role`, `create_category`, and `create_channel` have special support as embedded native calls in f-strings. The parser also specially supports `randint(MIN, MAX)` and the no-argument server-list functions (`guilds_roles()`, `guilds_members()`, `guilds_channels()`, and `guilds_categories()`) inside f-strings. These are explicit exceptions, not general function-call support:
 
 ```text
 @send(f"Role: {@create_role("Helpers", "#5865F2")}");
@@ -245,6 +245,8 @@ set helper_role = @create_role("Helpers", "#5865F2");
 
 The administrator permission remains forbidden even in embedded calls.
 
+A limited nested-call exception is supported for assigning a newly created role directly: `@give_role(USER, create_role(...));` and `@remove_role(USER, create_role(...));`. This creates the role first, then assigns or removes that newly created role. Other arbitrary nested native calls are not supported.
+
 ### Channels and categories
 
 | Function | Behavior |
@@ -303,7 +305,7 @@ The bot's top role must be above roles it assigns or removes. The caller's top r
 
 Not implemented as native functions: `@dm`, `@lock`, `@unlock`, `@set_channel`, `@set_role`, `@time`, `@uptime`, and `@random(collection)`. Use `randint(MIN, MAX)` for random integers.
 
-Also unsupported: `let` declarations, native calls without `@`, compact legacy syntax `v(...)`, `m(...)`, `R(...)`, `I(...)`, `E(...)`, `elif`, loops over Discord collections, general nested native calls, arbitrary Python execution, imports, and object attribute access.
+Also unsupported: `let` declarations, native calls without `@`, compact legacy syntax `v(...)`, `m(...)`, `R(...)`, `I(...)`, `E(...)`, `elif`, loops over Discord collections, arbitrary nested native calls beyond the explicitly documented role-creation exception, arbitrary Python execution, imports, and object attribute access.
 
 ## 13. Limits
 
@@ -324,8 +326,7 @@ var username.input{str, "What is your name?"} = "";
 var greeting.str = "Welcome";
 @send(f"{greeting}, {username}!");
 
-var count.int = 3;
-repeat(count) {
+repeat(3) {
     @send(f"Message {count}");
 }
 
